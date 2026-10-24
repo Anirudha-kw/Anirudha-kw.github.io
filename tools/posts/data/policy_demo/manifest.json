@@ -1,0 +1,42 @@
+{
+ "schema": "reach2-policy-v1",
+ "robot": "planar two-link arm (L1 = 0.40 m, L2 = 0.35 m)",
+ "observation": {
+  "names": [
+   "q1",
+   "q2",
+   "target_x",
+   "target_y",
+   "hand_x",
+   "hand_y"
+  ],
+  "units": [
+   "rad",
+   "rad",
+   "m",
+   "m",
+   "m",
+   "m"
+  ],
+  "frame": "base frame, x forward, y left"
+ },
+ "action": {
+  "names": [
+   "dq1_target",
+   "dq2_target"
+  ],
+  "units": [
+   "rad",
+   "rad"
+  ],
+  "meaning": "increment to the joint-position target",
+  "limits": [
+   -0.15,
+   0.15
+  ]
+ },
+ "policy_hz": 20,
+ "tracker_hz": 1000,
+ "normalization": "inside policy.pt (normalization) and policy.safetensors (norm.*)",
+ "weights_sha256": "7dbdab07cdb6d8e67545c731bbc3a5d4e5a77cadacfd9f0f8d215a04bef36de9"
+}

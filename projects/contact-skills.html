@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact-Rich Skills from a Few Demonstrations · Anirudha Karande</title>
+  <meta name="description" content="Learning contact-rich robot skills from a few demonstrations, by turning them into verified practice in simulation and bringing them back to the real robot.">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=IBM+Plex+Mono:wght@400&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+  <link rel="stylesheet" href="../style.css?v=13">
+  <script src="../theme.js?v=5"></script>
+</head>
+<body>
+  <article class="post project">
+    <div class="post-top"><a class="back" href="../index.html#work">&larr; Anirudha Karande</a><button class="theme-toggle" type="button" aria-label="Switch between light and dark"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button></div>
+    <h1>Learning Contact-Rich Skills from a Few Demonstrations</h1>
+    <p class="byline">Anirudha Karande and <a href="https://users.wpi.edu/~jxiao2/">Jing Xiao</a></p>
+    <p class="meta">[Paper in preparation · first author, led independently]</p>
+
+    <figure class="fig wide lead">
+      <video src="media/contact_collage.mp4" poster="media/contact_collage.jpg" width="1600" height="900" autoplay muted
+        loop playsinline controls preload="metadata"></video>
+      <figcaption>Peg insertion on a real Franka Panda (left) and in simulation (right), on shapes seen and unseen in
+        training, at 4× speed. In simulation, the purple ellipsoid shows the stiffness the robot commands.</figcaption>
+    </figure>
+
+    <h2>Motivation</h2>
+    <p>Robots are starting to work in factories, but the hardest moments of their jobs are moments of contact: fitting a
+      part into a fixture, seating a tool, pressing along a surface. Success depends on how the robot moves and how
+      firmly it holds at the instant it touches, and that is exactly what is hardest to teach. A person can show a robot where to go, but not how stiff to be, and collecting many demonstrations is slow and expensive.</p>
+    <p>People do this without thinking. When we put a key in a lock or a plug in a socket, we move to find the opening
+      and, at the same time, change how firmly we hold: loose enough to let the part slide along the edges into place,
+      firm enough to push it home. Motion and stiffness work together, and both change from moment to moment. We want
+      robots to learn both, the way people use them.</p>
+    <p>The internet taught machines to talk, but nothing written down teaches them to touch: nobody has ever
+      recorded how hard to press. Each source of robot data covers only part of it. Video shows the motion but never
+      the force, teleoperation records forces but only at human speed, and simulation is fast but least accurate
+      exactly where contact happens.</p>
+    <p>Our goal is to <b>learn contact-rich skills from just a few human demonstrations</b>. We turn those few examples into a
+      large amount of practice in simulation, check that what the robot learns actually works, and bring the skill back to the real robot. The skill still comes from people; the robot multiplies it
+      rather than replacing it.</p>
+
+    <h2>What our method delivers</h2>
+    <ul>
+      <li><b>A few demonstrations, at scale.</b> A handful of human demonstrations becomes a large set of training
+        examples, produced by computation rather than hours of teleoperation.</li>
+      <li><b>Grounded in physics.</b> Every example is checked in physics simulation, with contact, force and friction,
+        before the robot learns from it, so it learns from what actually works, not from what only looks right.</li>
+      <li><b>Motion and stiffness together.</b> Like a person, the robot learns both where to move and how firmly to
+        hold at each moment of contact.</li>
+      <li><b>High-precision assembly.</b> Parts go into holes with clearances as low as 0.1 mm per side.</li>
+      <li><b>Generalizes across geometries and tolerances.</b> One policy handles varied peg shapes and clearances,
+        including shapes it never saw in training.</li>
+      <li><b>High success rate.</b> On the hardest insertions it succeeds about twice as often as the best fixed-stiffness
+        controller.</li>
+      <li><b>Zero-shot across robots.</b> A policy learned on a Franka Panda runs on a KUKA iiwa with no retraining.</li>
+      <li><b>Gentle, readable contact.</b> The robot commands an explicit stiffness and keeps contact forces low.</li>
+      <li><b>Real to sim to real.</b> It starts from real demonstrations and is built to bring the skill back to the
+        real robot.</li>
+    </ul>
+    <p class="note">Precision, generalization, success-rate and cross-robot results are from simulation.</p>
+
+    <figure class="fig wide">
+      <video src="media/contact_plots.mp4" poster="media/contact_plots.jpg" width="1920" height="1080" autoplay muted
+        loop playsinline controls preload="metadata"></video>
+      <figcaption>The same learned policy on a Franka Panda and a KUKA iiwa, inserting a star-shaped peg, with the
+        stiffness it commands and the contact force it makes along the way.</figcaption>
+    </figure>
+
+    <p class="note">More details once the paper is out.</p>
+  </article>
+</body>
+</html>
