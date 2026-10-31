@@ -1,0 +1,1591 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Models and Two-Speed Adaptation · Anirudha Karande</title>
+  <meta name="description" content="Forward and inverse models, multiple-model control and two-timescale adaptation, and their robot-learning counterparts.">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+  <link rel="stylesheet" href="../style.css?v=5">
+  <script src="../theme.js?v=5"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\(', right: '\\)', display: false}]})"></script>
+</head>
+<body>
+  <article class="post">
+    <div class="post-top"><a class="back" href="../index.html">&larr; Anirudha Karande</a><button class="theme-toggle" type="button" aria-label="Switch between light and dark"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button></div>
+    <h1>Internal Models and Two-Speed Adaptation</h1>
+    <p class="meta">[Literature Review]</p>
+<p class="note">Part of a series on sensorimotor neuroscience and robot learning: <a href="lit-human-impedance.html">impedance</a> · <a href="lit-internal-models.html">internal models</a> · <a href="lit-optimal-feedback.html">optimal feedback control</a> · <a href="lit-touch-grip.html">touch and grip</a> · <a href="lit-synergies.html">synergies and primitives</a> · <a href="lit-population-dynamics.html">population dynamics</a>.</p>
+    <div class="tldr"><p>To move well with delayed, noisy senses, the brain predicts. It runs <i>forward models</i>
+    that map motor commands to their consequences and <i>inverse models</i> that map desired consequences to commands,
+    and it keeps both up to date with learning processes that run at different speeds. Robot learning has rebuilt
+    most of these ideas under other names: world models, system identification, rapid motor adaptation, mixtures of
+    experts.</p></div>
+
+    <h2>1. Learning a new dynamics: force fields and after-effects</h2>
+    <p>Shadmehr and Mussa-Ivaldi (1994) had subjects reach while a robot handle applied a velocity-dependent force
+    perpendicular to the hand's motion. Paths that started curved became straight over practice. When the field was
+    unexpectedly switched off, the paths curved the <i>other</i> way: mirror-image after-effects. Subjects had not
+    simply stiffened; they had learned to predict and cancel the field, an internal model of the new dynamics. How
+    that learning generalised across the workspace suggested it was represented in joint-based, intrinsic
+    coordinates.</p>
+
+    <h2>2. Forward models for estimation</h2>
+    <p>Sensory feedback arrives late, tens of milliseconds for proprioception and longer for vision, which is too
+    slow to estimate where a fast-moving hand is right now. Wolpert, Ghahramani and Jordan (1995) asked subjects to judge the
+    position of their unseen hand after movements under assistive or resistive forces. The bias and variance of their
+    estimates over time were explained by a Kalman filter that combines a forward-model prediction from the motor
+    command with delayed sensory feedback:</p>
+    $$\hat x_{t+1} = \underbrace{A\hat x_t + Bu_t}_{\text{forward model}} + L_t\big(y_{t+1} - C(A\hat x_t + Bu_t)\big).$$
+    <p>This is the same structure as a robot's state estimator: a dynamics model propagates the state, sensors
+    correct it, and the gain trades their noise. Wolpert, Miall and Kawato (1998) reviewed evidence that the
+    cerebellum implements such predictive models.</p>
+
+    <h2>3. Many models, one controller</h2>
+    <p>People switch effortlessly between tools and objects with very different dynamics. MOSAIC (Wolpert and Kawato
+    1998) proposes many paired forward and inverse models. Each forward model's prediction error determines a
+    "responsibility" signal, and the motor command is the responsibility-weighted blend of the inverse models'
+    commands. Learning updates each pair in proportion to its responsibility. In modern terms it is a mixture of
+    experts gated by how well each expert predicts the present, which is close to what a robot needs when the object
+    in its hand changes.</p>
+
+    <h2>4. Two learners at two speeds</h2>
+    <p>Motor adaptation shows <i>savings</i> (relearning is faster than learning) and <i>spontaneous recovery</i>
+    (after adapting and then briefly de-adapting, behaviour drifts back toward the first adaptation when error
+    feedback is removed). Smith, Ghazizadeh and Shadmehr (2006) explained both with two linear processes driven by
+    the same error \(e_n = f_n - x_n\):</p>
+    $$x^f_{n+1} = A_f\,x^f_n + B_f\,e_n,\qquad x^s_{n+1} = A_s\,x^s_n + B_s\,e_n,\qquad x_n = x^f_n + x^s_n,$$
+    <p>with a fast process that learns and forgets quickly (\(A_f = 0.92, B_f = 0.03\)) and a slow one that learns and
+    forgets slowly (\(A_s = 0.996, B_s = 0.004\)). After long adaptation the slow state holds most of the learning; a
+    short de-adaptation drives the fast state negative and the net output to zero; in an error clamp the fast state
+    decays away first, revealing the slow state underneath. Figure 1 reruns their model with their parameters.</p>
+    <figure class="fig">
+<svg role="img" aria-label="Two-rate model of motor adaptation" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 417.325 205.577053" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ 
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="tworatemodel-figure_1">
+  <g id="tworatemodel-patch_1">
+   <path d="M 0 205.577053 
+L 417.325 205.577053 
+L 417.325 0 
+L 0 0 
+L 0 205.577053 
+z
+" style="fill: none"/>
+  </g>
+  <g id="tworatemodel-axes_1">
+   <g id="tworatemodel-patch_2">
+    <path d="M 46.165 169.697053 
+L 414.445 169.697053 
+L 414.445 3.377053 
+L 46.165 3.377053 
+L 46.165 169.697053 
+z
+" style="fill: none"/>
+   </g>
+   <g id="tworatemodel-patch_3">
+    <path d="M 80.619286 169.697053 
+L 275.476429 169.697053 
+L 275.476429 3.377053 
+L 80.619286 3.377053 
+z
+" clip-path="url(#tworatemodel-p37c3c79d3f)" style="fill: var(--faint); opacity: 0.6"/>
+   </g>
+   <g id="tworatemodel-patch_4">
+    <path d="M 275.476429 169.697053 
+L 291.419286 169.697053 
+L 291.419286 3.377053 
+L 275.476429 3.377053 
+z
+" clip-path="url(#tworatemodel-p37c3c79d3f)" style="fill: var(--hover); opacity: 0.12"/>
+   </g>
+   <g id="tworatemodel-patch_5">
+    <path d="M 291.419286 169.697053 
+L 397.705 169.697053 
+L 397.705 3.377053 
+L 291.419286 3.377053 
+z
+" clip-path="url(#tworatemodel-p37c3c79d3f)" style="fill: var(--accent); opacity: 0.08"/>
+   </g>
+   <g id="tworatemodel-matplotlib.axis_1">
+    <g id="tworatemodel-xtick_1">
+     <g id="tworatemodel-line2d_1">
+      <defs>
+       <path id="tworatemodel-m5f4c7d4daa" d="M 0 0 
+L 0 3.5 
+" style="stroke: var(--muted); stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="62.905" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_1">
+      <!-- 0 -->
+      <g style="fill: var(--fg)" transform="translate(60.155 184.947053) scale(0.11 -0.11)">
+       <defs>
+        <path id="tworatemodel-STIXGeneral-Regular-13" d="M 3046 2112 
+Q 3046 1683 2963 1302 
+Q 2880 922 2717 602 
+Q 2554 282 2266 96 
+Q 1978 -90 1600 -90 
+Q 1210 -90 915 108 
+Q 621 307 461 640 
+Q 301 973 227 1350 
+Q 154 1728 154 2150 
+Q 154 2746 301 3222 
+Q 448 3699 790 4012 
+Q 1133 4326 1626 4326 
+Q 2253 4326 2649 3712 
+Q 3046 3098 3046 2112 
+z
+M 2432 2080 
+Q 2432 3091 2217 3625 
+Q 2003 4160 1587 4160 
+Q 1190 4160 979 3622 
+Q 768 3085 768 2106 
+Q 768 1120 979 598 
+Q 1190 77 1600 77 
+Q 2003 77 2217 598 
+Q 2432 1120 2432 2080 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-xtick_2">
+     <g id="tworatemodel-line2d_2">
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="107.190714" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_2">
+      <!-- 50 -->
+      <g style="fill: var(--fg)" transform="translate(101.690714 184.947053) scale(0.11 -0.11)">
+       <defs>
+        <path id="tworatemodel-STIXGeneral-Regular-18" d="M 2803 4358 
+L 2573 3814 
+Q 2534 3731 2400 3731 
+L 1158 3731 
+L 902 3187 
+Q 1606 3053 1920 2896 
+Q 2234 2739 2502 2368 
+Q 2726 2061 2726 1555 
+Q 2726 1094 2576 780 
+Q 2426 467 2099 224 
+Q 1664 -90 1011 -90 
+Q 646 -90 422 19 
+Q 198 128 198 307 
+Q 198 550 486 550 
+Q 717 550 960 352 
+Q 1210 147 1414 147 
+Q 1747 147 2012 480 
+Q 2278 813 2278 1229 
+Q 2278 1843 1850 2189 
+Q 1293 2637 486 2637 
+Q 410 2637 410 2688 
+L 416 2720 
+L 1114 4237 
+L 2438 4237 
+Q 2547 4237 2608 4269 
+Q 2669 4301 2746 4403 
+L 2803 4358 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-18"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(50 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-xtick_3">
+     <g id="tworatemodel-line2d_3">
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="151.476429" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_3">
+      <!-- 100 -->
+      <g style="fill: var(--fg)" transform="translate(143.226429 184.947053) scale(0.11 -0.11)">
+       <defs>
+        <path id="tworatemodel-STIXGeneral-Regular-14" d="M 2522 0 
+L 755 0 
+L 755 96 
+Q 1107 115 1235 227 
+Q 1363 339 1363 608 
+L 1363 3482 
+Q 1363 3795 1171 3795 
+Q 1082 3795 883 3718 
+L 710 3654 
+L 710 3744 
+L 1856 4326 
+L 1914 4307 
+L 1914 486 
+Q 1914 275 2042 185 
+Q 2170 96 2522 96 
+L 2522 0 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-14"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(100 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-xtick_4">
+     <g id="tworatemodel-line2d_4">
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="195.762143" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_4">
+      <!-- 150 -->
+      <g style="fill: var(--fg)" transform="translate(187.512143 184.947053) scale(0.11 -0.11)">
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-14"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-18" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(100 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-xtick_5">
+     <g id="tworatemodel-line2d_5">
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="240.047857" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_5">
+      <!-- 200 -->
+      <g style="fill: var(--fg)" transform="translate(231.797857 184.947053) scale(0.11 -0.11)">
+       <defs>
+        <path id="tworatemodel-STIXGeneral-Regular-15" d="M 3034 877 
+L 2688 0 
+L 186 0 
+L 186 77 
+L 1325 1286 
+Q 1773 1754 1965 2144 
+Q 2157 2534 2157 2950 
+Q 2157 3379 1920 3616 
+Q 1683 3853 1267 3853 
+Q 922 3853 720 3673 
+Q 518 3494 326 3021 
+L 192 3053 
+Q 301 3648 630 3987 
+Q 960 4326 1523 4326 
+Q 2054 4326 2380 4006 
+Q 2707 3686 2707 3200 
+Q 2707 2477 1888 1613 
+L 832 486 
+L 2330 486 
+Q 2541 486 2665 569 
+Q 2790 653 2944 915 
+L 3034 877 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-15"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(100 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-xtick_6">
+     <g id="tworatemodel-line2d_6">
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="284.333571" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_6">
+      <!-- 250 -->
+      <g style="fill: var(--fg)" transform="translate(276.083571 184.947053) scale(0.11 -0.11)">
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-15"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-18" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(100 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-xtick_7">
+     <g id="tworatemodel-line2d_7">
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="328.619286" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_7">
+      <!-- 300 -->
+      <g style="fill: var(--fg)" transform="translate(320.369286 184.947053) scale(0.11 -0.11)">
+       <defs>
+        <path id="tworatemodel-STIXGeneral-Regular-16" d="M 390 3264 
+L 288 3290 
+Q 435 3770 748 4048 
+Q 1062 4326 1542 4326 
+Q 1990 4326 2265 4083 
+Q 2541 3840 2541 3450 
+Q 2541 2925 1946 2566 
+Q 2298 2413 2477 2227 
+Q 2758 1914 2758 1402 
+Q 2758 890 2464 506 
+Q 2246 211 1840 60 
+Q 1434 -90 979 -90 
+Q 262 -90 262 275 
+Q 262 378 339 442 
+Q 416 506 525 506 
+Q 685 506 915 339 
+Q 1197 141 1466 141 
+Q 1818 141 2058 425 
+Q 2298 710 2298 1120 
+Q 2298 1856 1632 2048 
+Q 1434 2112 979 2112 
+L 979 2202 
+Q 1338 2323 1517 2432 
+Q 2035 2726 2035 3290 
+Q 2035 3610 1852 3776 
+Q 1670 3942 1344 3942 
+Q 768 3942 390 3264 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-16"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(100 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-xtick_8">
+     <g id="tworatemodel-line2d_8">
+      <g>
+       <use xlink:href="#tworatemodel-m5f4c7d4daa" x="372.905" y="169.697053" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_8">
+      <!-- 350 -->
+      <g style="fill: var(--fg)" transform="translate(364.655 184.947053) scale(0.11 -0.11)">
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-16"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-18" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(100 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-text_9">
+     <!-- trial -->
+     <g style="fill: var(--fg)" transform="translate(221.34 199.947053) scale(0.11 -0.11)">
+      <defs>
+       <path id="tworatemodel-STIXGeneral-Regular-57" d="M 1702 493 
+L 1786 422 
+Q 1478 -64 1011 -64 
+Q 448 -64 448 749 
+L 448 2675 
+L 109 2675 
+Q 83 2694 83 2720 
+Q 83 2771 192 2842 
+Q 435 2982 813 3526 
+Q 826 3546 874 3606 
+Q 922 3667 941 3706 
+Q 986 3706 986 3622 
+L 986 2880 
+L 1632 2880 
+L 1632 2675 
+L 986 2675 
+L 986 845 
+Q 986 538 1062 403 
+Q 1139 269 1318 269 
+Q 1510 269 1702 493 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-55" d="M 1024 2931 
+L 1024 2342 
+Q 1267 2688 1430 2816 
+Q 1594 2944 1792 2944 
+Q 1958 2944 2051 2854 
+Q 2144 2765 2144 2605 
+Q 2144 2470 2077 2393 
+Q 2010 2317 1894 2317 
+Q 1773 2317 1638 2445 
+Q 1536 2541 1472 2541 
+Q 1338 2541 1181 2355 
+Q 1024 2170 1024 2016 
+L 1024 576 
+Q 1024 301 1133 205 
+Q 1242 109 1568 96 
+L 1568 0 
+L 32 0 
+L 32 96 
+Q 339 154 412 224 
+Q 486 294 486 538 
+L 486 2138 
+Q 486 2349 438 2435 
+Q 390 2522 269 2522 
+Q 166 2522 45 2496 
+L 45 2598 
+Q 448 2726 992 2944 
+L 1024 2931 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-4c" d="M 1152 4045 
+Q 1152 3904 1056 3811 
+Q 960 3718 819 3718 
+Q 685 3718 592 3811 
+Q 499 3904 499 4045 
+Q 499 4179 595 4275 
+Q 691 4371 826 4371 
+Q 966 4371 1059 4275 
+Q 1152 4179 1152 4045 
+z
+M 1619 0 
+L 102 0 
+L 102 96 
+Q 435 115 521 211 
+Q 608 307 608 666 
+L 608 2118 
+Q 608 2342 563 2432 
+Q 518 2522 397 2522 
+Q 243 2522 128 2490 
+L 128 2592 
+L 1120 2944 
+L 1146 2918 
+L 1146 672 
+Q 1146 314 1226 218 
+Q 1306 122 1619 96 
+L 1619 0 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-44" d="M 2829 422 
+L 2829 243 
+Q 2586 -64 2253 -64 
+Q 1888 -64 1843 403 
+L 1837 403 
+Q 1427 -64 909 -64 
+Q 608 -64 422 112 
+Q 237 288 237 602 
+Q 237 1050 685 1350 
+Q 992 1555 1837 1869 
+L 1837 2214 
+Q 1837 2502 1699 2646 
+Q 1562 2790 1338 2790 
+Q 1146 2790 1018 2697 
+Q 890 2605 890 2477 
+Q 890 2419 909 2348 
+Q 928 2278 928 2208 
+Q 928 2112 841 2029 
+Q 755 1946 634 1946 
+Q 525 1946 441 2029 
+Q 358 2112 358 2240 
+Q 358 2547 685 2752 
+Q 986 2944 1421 2944 
+Q 1939 2944 2176 2656 
+Q 2291 2522 2323 2384 
+Q 2355 2246 2355 1946 
+L 2355 723 
+Q 2355 301 2554 301 
+Q 2682 301 2829 422 
+z
+M 1837 813 
+L 1837 1715 
+Q 1248 1510 1018 1293 
+Q 800 1094 800 800 
+Q 800 557 921 432 
+Q 1043 307 1242 307 
+Q 1453 307 1613 410 
+Q 1747 506 1792 589 
+Q 1837 672 1837 813 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-4f" d="M 1645 0 
+L 134 0 
+L 134 96 
+Q 435 122 531 221 
+Q 627 320 627 589 
+L 627 3590 
+Q 627 3821 569 3910 
+Q 512 4000 358 4000 
+Q 224 4000 122 3987 
+L 122 4090 
+Q 730 4237 1133 4371 
+L 1165 4346 
+L 1165 557 
+Q 1165 288 1254 201 
+Q 1344 115 1645 96 
+L 1645 0 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-55" transform="translate(27.796875 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-4c" transform="translate(63 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(90.796875 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-4f" transform="translate(135.203125 0)"/>
+     </g>
+    </g>
+   </g>
+   <g id="tworatemodel-matplotlib.axis_2">
+    <g id="tworatemodel-ytick_1">
+     <g id="tworatemodel-line2d_9">
+      <defs>
+       <path id="tworatemodel-me3fddc974c" d="M 0 0 
+L -3.5 0 
+" style="stroke: var(--muted); stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#tworatemodel-me3fddc974c" x="46.165" y="147.812842" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_10">
+      <!-- −0.5 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 151.937842) scale(0.11 -0.11)">
+       <defs>
+        <path id="tworatemodel-STIXGeneral-Regular-425" d="M 3974 1408 
+L 410 1408 
+L 410 1830 
+L 3974 1830 
+L 3974 1408 
+z
+" transform="scale(0.015625)"/>
+        <path id="tworatemodel-STIXGeneral-Regular-11" d="M 1158 275 
+Q 1158 134 1052 32 
+Q 947 -70 800 -70 
+Q 653 -70 550 32 
+Q 448 134 448 281 
+Q 448 429 553 534 
+Q 659 640 806 640 
+Q 947 640 1052 531 
+Q 1158 422 1158 275 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-425"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(68.5 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-11" transform="translate(118.5 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-18" transform="translate(143.5 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-ytick_2">
+     <g id="tworatemodel-line2d_10">
+      <g>
+       <use xlink:href="#tworatemodel-me3fddc974c" x="46.165" y="104.044421" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_11">
+      <!-- 0.0 -->
+      <g style="fill: var(--fg)" transform="translate(25.415 108.169421) scale(0.11 -0.11)">
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-ytick_3">
+     <g id="tworatemodel-line2d_11">
+      <g>
+       <use xlink:href="#tworatemodel-me3fddc974c" x="46.165" y="60.276" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_12">
+      <!-- 0.5 -->
+      <g style="fill: var(--fg)" transform="translate(25.415 64.401) scale(0.11 -0.11)">
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-18" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-ytick_4">
+     <g id="tworatemodel-line2d_12">
+      <g>
+       <use xlink:href="#tworatemodel-me3fddc974c" x="46.165" y="16.507579" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="tworatemodel-text_13">
+      <!-- 1.0 -->
+      <g style="fill: var(--fg)" transform="translate(25.415 20.632579) scale(0.11 -0.11)">
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-14"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#tworatemodel-STIXGeneral-Regular-13" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="tworatemodel-text_14">
+     <!-- adaptation -->
+     <g style="fill: var(--fg)" transform="translate(11.13 109.500412) rotate(-90) scale(0.11 -0.11)">
+      <defs>
+       <path id="tworatemodel-STIXGeneral-Regular-47" d="M 3142 269 
+L 2202 -64 
+L 2176 -45 
+L 2176 365 
+Q 1869 -64 1357 -64 
+Q 826 -64 499 317 
+Q 173 698 173 1312 
+Q 173 1990 563 2467 
+Q 954 2944 1504 2944 
+Q 1850 2944 2176 2669 
+L 2176 3667 
+Q 2176 3866 2118 3930 
+Q 2061 3994 1882 3994 
+Q 1792 3994 1741 3987 
+L 1741 4090 
+Q 2323 4243 2682 4371 
+L 2714 4358 
+L 2714 730 
+Q 2714 506 2768 435 
+Q 2822 365 2995 365 
+Q 3034 365 3142 371 
+L 3142 269 
+z
+M 2176 653 
+L 2176 2125 
+Q 2176 2381 1981 2573 
+Q 1786 2765 1523 2765 
+Q 1158 2765 940 2438 
+Q 723 2112 723 1568 
+Q 723 979 963 624 
+Q 1203 269 1606 269 
+Q 1907 269 2080 474 
+Q 2176 582 2176 653 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-53" d="M 1018 2931 
+L 1018 2438 
+Q 1421 2944 1939 2944 
+Q 2406 2944 2707 2560 
+Q 3008 2176 3008 1581 
+Q 3008 883 2621 409 
+Q 2234 -64 1664 -64 
+Q 1466 -64 1328 -6 
+Q 1190 51 1018 211 
+L 1018 -794 
+Q 1018 -1094 1120 -1180 
+Q 1222 -1267 1581 -1274 
+L 1581 -1389 
+L 32 -1389 
+L 32 -1280 
+Q 314 -1254 397 -1171 
+Q 480 -1088 480 -838 
+L 480 2157 
+Q 480 2381 429 2451 
+Q 378 2522 218 2522 
+Q 115 2522 58 2515 
+L 58 2618 
+Q 506 2752 979 2944 
+L 1018 2931 
+z
+M 1018 2138 
+L 1018 563 
+Q 1018 422 1238 281 
+Q 1459 141 1683 141 
+Q 2029 141 2243 467 
+Q 2458 794 2458 1325 
+Q 2458 1888 2243 2224 
+Q 2029 2560 1670 2560 
+Q 1446 2560 1232 2419 
+Q 1018 2278 1018 2138 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-52" d="M 3008 1478 
+Q 3008 806 2608 371 
+Q 2208 -64 1568 -64 
+Q 979 -64 582 368 
+Q 186 800 186 1459 
+Q 186 2125 582 2534 
+Q 979 2944 1626 2944 
+Q 2221 2944 2614 2537 
+Q 3008 2131 3008 1478 
+z
+M 2432 1306 
+Q 2432 2035 2112 2445 
+Q 1856 2765 1504 2765 
+Q 1171 2765 966 2493 
+Q 762 2221 762 1747 
+Q 762 928 1101 435 
+Q 1318 115 1677 115 
+Q 2029 115 2230 432 
+Q 2432 749 2432 1306 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-51" d="M 3104 0 
+L 1773 0 
+L 1779 96 
+Q 2016 115 2096 233 
+Q 2176 352 2176 672 
+L 2176 1946 
+Q 2176 2592 1709 2592 
+Q 1549 2592 1408 2515 
+Q 1267 2438 1050 2227 
+L 1050 461 
+Q 1050 269 1136 192 
+Q 1222 115 1466 96 
+L 1466 0 
+L 115 0 
+L 115 96 
+Q 358 115 435 214 
+Q 512 314 512 602 
+L 512 2157 
+Q 512 2394 467 2483 
+Q 422 2573 288 2573 
+Q 160 2573 102 2547 
+L 102 2656 
+Q 550 2784 979 2944 
+L 1030 2925 
+L 1030 2426 
+L 1037 2426 
+Q 1491 2944 1958 2944 
+Q 2323 2944 2518 2688 
+Q 2714 2432 2714 1958 
+L 2714 544 
+Q 2714 288 2790 205 
+Q 2867 122 3104 96 
+L 3104 0 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-47" transform="translate(44.40625 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(94.40625 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-53" transform="translate(138.8125 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(188.71875 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(217.515625 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(261.921875 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-4c" transform="translate(289.71875 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(317.515625 0)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-51" transform="translate(367.515625 0)"/>
+     </g>
+    </g>
+   </g>
+   <g id="tworatemodel-line2d_13">
+    <path d="M 62.905 104.044421 
+L 80.619286 104.044421 
+L 82.390714 98.404597 
+L 84.162143 93.880811 
+L 85.933571 90.239658 
+L 87.705 87.296729 
+L 89.476429 84.90632 
+L 91.247857 82.953312 
+L 93.019286 81.346743 
+L 94.790714 80.014738 
+L 96.562143 78.900503 
+L 99.219286 77.541921 
+L 101.876429 76.460687 
+L 105.419286 75.315773 
+L 109.847857 74.192847 
+L 115.162143 73.112197 
+L 122.247857 71.91591 
+L 131.990714 70.502734 
+L 145.276429 68.80708 
+L 161.219286 67.009737 
+L 178.047857 65.341842 
+L 195.762143 63.806284 
+L 215.247857 62.343601 
+L 236.505 60.98062 
+L 259.533571 59.736529 
+L 275.476429 58.996403 
+L 277.247857 70.199314 
+L 279.019286 79.171196 
+L 280.790714 86.378844 
+L 282.562143 92.191062 
+L 284.333571 96.899241 
+L 286.105 100.73361 
+L 287.876429 103.876077 
+L 289.647857 106.470378 
+L 291.419286 108.63009 
+L 293.190714 105.036846 
+L 294.962143 102.01859 
+L 296.733571 99.486819 
+L 298.505 97.366625 
+L 300.276429 95.594611 
+L 302.047857 94.117114 
+L 303.819286 92.88872 
+L 305.590714 91.870989 
+L 308.247857 90.669608 
+L 310.905 89.780666 
+L 313.562143 89.13446 
+L 317.105 88.558428 
+L 320.647857 88.222176 
+L 325.076429 88.03556 
+L 330.390714 88.035908 
+L 338.362143 88.296304 
+L 350.762143 88.969063 
+L 396.819286 91.732095 
+L 396.819286 91.732095 
+" clip-path="url(#tworatemodel-p37c3c79d3f)" style="fill: none; stroke: var(--fg); stroke-width: 2.2; stroke-linecap: square"/>
+   </g>
+   <g id="tworatemodel-line2d_14">
+    <path d="M 62.905 104.044421 
+L 80.619286 104.044421 
+L 82.390714 99.091587 
+L 84.162143 95.206639 
+L 85.933571 92.164975 
+L 87.705 89.789155 
+L 89.476429 87.939002 
+L 91.247857 86.503777 
+L 93.019286 85.395997 
+L 94.790714 84.546553 
+L 96.562143 83.900851 
+L 99.219286 83.222512 
+L 101.876429 82.798345 
+L 105.419286 82.498946 
+L 109.847857 82.390922 
+L 116.047857 82.502399 
+L 126.676429 82.964939 
+L 168.305 84.927184 
+L 195.762143 85.941536 
+L 226.762143 86.855406 
+L 261.305 87.6459 
+L 275.476429 87.913782 
+L 277.247857 97.850916 
+L 279.019286 105.651847 
+L 280.790714 111.765788 
+L 282.562143 116.547624 
+L 284.333571 120.277714 
+L 286.105 123.177544 
+L 287.876429 125.422082 
+L 289.647857 127.149554 
+L 291.419286 128.46915 
+L 293.190714 124.717512 
+L 294.962143 121.542125 
+L 296.733571 118.854478 
+L 298.505 116.579653 
+L 300.276429 114.654241 
+L 302.047857 113.024573 
+L 303.819286 111.645222 
+L 305.590714 110.477739 
+L 308.247857 109.053968 
+L 310.905 107.945295 
+L 313.562143 107.081985 
+L 317.105 106.220511 
+L 320.647857 105.603356 
+L 325.076429 105.071886 
+L 330.390714 104.66743 
+L 337.476429 104.364161 
+L 348.105 104.161979 
+L 367.590714 104.063196 
+L 396.819286 104.045619 
+L 396.819286 104.045619 
+" clip-path="url(#tworatemodel-p37c3c79d3f)" style="fill: none; stroke-dasharray: 5.6,2.8; stroke-dashoffset: 0; stroke: var(--hover); stroke-width: 1.4"/>
+   </g>
+   <g id="tworatemodel-line2d_15">
+    <path d="M 62.905 104.044421 
+L 80.619286 104.044421 
+L 84.162143 102.718593 
+L 88.590714 101.278807 
+L 94.790714 99.512607 
+L 102.762143 97.492302 
+L 112.505 95.257195 
+L 124.019286 92.852716 
+L 136.419286 90.500246 
+L 149.705 88.220095 
+L 162.990714 86.163253 
+L 177.162143 84.190549 
+L 192.219286 82.318761 
+L 208.162143 80.560956 
+L 224.990714 78.926533 
+L 243.590714 77.351423 
+L 263.076429 75.927475 
+L 275.476429 75.127041 
+L 278.133571 76.988953 
+L 281.676429 79.179835 
+L 286.105 81.600487 
+L 291.419286 84.205361 
+L 315.333571 86.240189 
+L 340.133571 88.130225 
+L 366.705 89.933191 
+L 395.047857 91.631794 
+L 396.819286 91.730897 
+L 396.819286 91.730897 
+" clip-path="url(#tworatemodel-p37c3c79d3f)" style="fill: none; stroke-dasharray: 5.6,2.8; stroke-dashoffset: 0; stroke: var(--accent); stroke-width: 1.4"/>
+   </g>
+   <g id="tworatemodel-line2d_16">
+    <path d="M 46.165 104.044421 
+L 414.445 104.044421 
+" clip-path="url(#tworatemodel-p37c3c79d3f)" style="fill: none; stroke: var(--muted); stroke-width: 0.8; stroke-linecap: square"/>
+   </g>
+   <g id="tworatemodel-patch_6">
+    <path d="M 46.165 169.697053 
+L 46.165 3.377053 
+" style="fill: none; stroke: var(--muted); stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="tworatemodel-patch_7">
+    <path d="M 46.165 169.697053 
+L 414.445 169.697053 
+" style="fill: none; stroke: var(--muted); stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="tworatemodel-text_15">
+    <!-- adaptation -->
+    <g style="fill: var(--muted)" transform="translate(157.172076 10.38) scale(0.1 -0.1)">
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-44"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-47" transform="translate(44.40625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(94.40625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-53" transform="translate(138.8125 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(188.71875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(217.515625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(261.921875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-4c" transform="translate(289.71875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(317.515625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-51" transform="translate(367.515625 0)"/>
+    </g>
+   </g>
+   <g id="tworatemodel-text_16">
+    <!-- de-adapt. -->
+    <g style="fill: var(--muted)" transform="translate(264.98692 10.38) scale(0.1 -0.1)">
+     <defs>
+      <path id="tworatemodel-STIXGeneral-Regular-48" d="M 2611 1050 
+L 2714 1005 
+Q 2330 -64 1376 -64 
+Q 813 -64 486 329 
+Q 160 723 160 1389 
+Q 160 2074 525 2509 
+Q 890 2944 1485 2944 
+Q 2061 2944 2374 2502 
+Q 2560 2246 2592 1773 
+L 621 1773 
+Q 646 1370 700 1158 
+Q 755 947 915 730 
+Q 1184 378 1626 378 
+Q 1939 378 2153 531 
+Q 2368 685 2611 1050 
+z
+M 634 1978 
+L 1939 1978 
+Q 1882 2381 1750 2547 
+Q 1619 2714 1312 2714 
+Q 1043 2714 864 2525 
+Q 685 2336 634 1978 
+z
+" transform="scale(0.015625)"/>
+      <path id="tworatemodel-STIXGeneral-Regular-10" d="M 1824 1242 
+L 250 1242 
+L 250 1645 
+L 1824 1645 
+L 1824 1242 
+z
+" transform="scale(0.015625)"/>
+     </defs>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-47"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-48" transform="translate(50 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-10" transform="translate(94.40625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(127.703125 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-47" transform="translate(172.109375 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(222.109375 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-53" transform="translate(266.515625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(316.421875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-11" transform="translate(344.21875 0)"/>
+    </g>
+   </g>
+   <g id="tworatemodel-text_17">
+    <!-- error clamp -->
+    <g style="fill: var(--muted)" transform="translate(321.29183 10.38) scale(0.1 -0.1)">
+     <defs>
+      <path id="tworatemodel-STIXGeneral-Regular-3" transform="scale(0.015625)"/>
+      <path id="tworatemodel-STIXGeneral-Regular-46" d="M 2547 998 
+L 2637 941 
+Q 2362 403 2112 205 
+Q 1786 -64 1376 -64 
+Q 845 -64 502 336 
+Q 160 736 160 1357 
+Q 160 2170 698 2618 
+Q 1094 2944 1562 2944 
+Q 1965 2944 2256 2749 
+Q 2547 2554 2547 2285 
+Q 2547 2176 2457 2096 
+Q 2368 2016 2246 2016 
+Q 2022 2016 1939 2310 
+L 1901 2451 
+Q 1850 2630 1773 2694 
+Q 1696 2758 1523 2758 
+Q 1133 2758 893 2451 
+Q 653 2144 653 1645 
+Q 653 1094 928 745 
+Q 1203 397 1645 397 
+Q 1920 397 2118 528 
+Q 2317 659 2547 998 
+z
+" transform="scale(0.015625)"/>
+      <path id="tworatemodel-STIXGeneral-Regular-50" d="M 4960 0 
+L 3565 0 
+L 3565 96 
+Q 3834 122 3907 208 
+Q 3981 294 3981 576 
+L 3981 1894 
+Q 3981 2278 3869 2444 
+Q 3757 2611 3488 2611 
+Q 3264 2611 3107 2521 
+Q 2950 2432 2803 2221 
+L 2803 608 
+Q 2803 301 2896 201 
+Q 2989 102 3264 96 
+L 3264 0 
+L 1830 0 
+L 1830 96 
+Q 2112 115 2189 188 
+Q 2266 262 2266 550 
+L 2266 1901 
+Q 2266 2611 1850 2611 
+Q 1670 2611 1468 2531 
+Q 1267 2451 1171 2336 
+Q 1088 2240 1088 2227 
+L 1088 448 
+Q 1088 243 1177 176 
+Q 1267 109 1523 96 
+L 1523 0 
+L 102 0 
+L 102 96 
+Q 371 102 460 195 
+Q 550 288 550 563 
+L 550 2150 
+Q 550 2387 499 2480 
+Q 448 2573 326 2573 
+Q 230 2573 122 2547 
+L 122 2656 
+Q 557 2778 1011 2944 
+L 1062 2925 
+L 1062 2451 
+L 1075 2451 
+Q 1363 2752 1584 2848 
+Q 1805 2944 2054 2944 
+Q 2560 2944 2733 2406 
+Q 3232 2944 3776 2944 
+Q 4518 2944 4518 1792 
+L 4518 493 
+Q 4518 282 4582 202 
+Q 4646 122 4794 109 
+L 4960 96 
+L 4960 0 
+z
+" transform="scale(0.015625)"/>
+     </defs>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-48"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-55" transform="translate(44.40625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-55" transform="translate(80.296875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(113 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-55" transform="translate(163 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-3" transform="translate(196.296875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-46" transform="translate(221.296875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-4f" transform="translate(265.703125 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(293.5 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-50" transform="translate(337.90625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-53" transform="translate(415.40625 0)"/>
+    </g>
+   </g>
+   <g id="tworatemodel-patch_8">
+    <path d="M 352.77838 123.616471 
+Q 336.088411 106.747157 320.106143 90.593149 
+" style="fill: none; stroke: var(--fg); stroke-width: 0.9; stroke-linecap: round"/>
+    <path d="M 321.497663 94.843287 
+L 320.106143 90.593149 
+L 324.341165 92.030015 
+z
+" style="fill: var(--fg); stroke: var(--fg); stroke-width: 0.9; stroke-linecap: round"/>
+   </g>
+   <g id="tworatemodel-text_18">
+    <!-- spontaneous -->
+    <g style="fill: var(--fg)" transform="translate(346.333571 137.089684) scale(0.1 -0.1)">
+     <defs>
+      <path id="tworatemodel-STIXGeneral-Regular-56" d="M 998 1926 
+L 1664 1523 
+Q 1984 1331 2105 1164 
+Q 2227 998 2227 736 
+Q 2227 416 1961 176 
+Q 1696 -64 1331 -64 
+Q 1030 -64 864 -6 
+Q 691 51 570 51 
+Q 461 51 416 -26 
+L 333 -26 
+L 333 979 
+L 435 979 
+Q 538 512 730 294 
+Q 922 77 1248 77 
+Q 1485 77 1632 211 
+Q 1779 346 1779 550 
+Q 1779 845 1440 1030 
+L 1094 1222 
+Q 326 1651 326 2150 
+Q 326 2522 566 2730 
+Q 806 2938 1210 2938 
+Q 1491 2938 1638 2867 
+Q 1754 2816 1818 2816 
+Q 1862 2816 1920 2880 
+L 1990 2880 
+L 2022 2010 
+L 1926 2010 
+Q 1818 2445 1654 2621 
+Q 1491 2797 1203 2797 
+Q 986 2797 854 2688 
+Q 723 2579 723 2362 
+Q 723 2253 796 2128 
+Q 870 2003 998 1926 
+z
+" transform="scale(0.015625)"/>
+      <path id="tworatemodel-STIXGeneral-Regular-58" d="M 3072 320 
+L 3072 230 
+Q 2573 96 2195 -58 
+L 2163 -38 
+L 2163 486 
+L 2150 486 
+Q 1747 -64 1235 -64 
+Q 870 -64 662 160 
+Q 454 384 454 755 
+L 454 2362 
+Q 454 2598 371 2688 
+Q 288 2778 58 2790 
+L 58 2880 
+L 992 2880 
+L 992 813 
+Q 992 595 1123 451 
+Q 1254 307 1446 307 
+Q 1760 307 1984 506 
+Q 2067 582 2099 649 
+Q 2131 717 2131 877 
+L 2131 2355 
+Q 2131 2605 2041 2678 
+Q 1952 2752 1658 2771 
+L 1658 2880 
+L 2669 2880 
+L 2669 685 
+Q 2669 461 2742 390 
+Q 2816 320 3034 320 
+L 3072 320 
+z
+" transform="scale(0.015625)"/>
+     </defs>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-56"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-53" transform="translate(38.90625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(88.90625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-51" transform="translate(138.90625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(188.90625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(217.703125 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-51" transform="translate(262.109375 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-48" transform="translate(312.109375 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(356.515625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-58" transform="translate(406.515625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-56" transform="translate(456.515625 0)"/>
+    </g>
+    <!-- recovery -->
+    <g style="fill: var(--fg)" transform="translate(346.333571 152.189684) scale(0.1 -0.1)">
+     <defs>
+      <path id="tworatemodel-STIXGeneral-Regular-59" d="M 3053 2880 
+L 3053 2784 
+Q 2906 2771 2835 2688 
+Q 2765 2605 2637 2285 
+L 1818 230 
+Q 1690 -90 1638 -90 
+Q 1587 -90 1523 77 
+Q 1510 96 1497 141 
+Q 1485 186 1472 211 
+L 704 2048 
+Q 499 2534 403 2652 
+Q 307 2771 122 2784 
+L 122 2880 
+L 1376 2880 
+L 1376 2784 
+Q 1210 2771 1146 2732 
+Q 1082 2694 1082 2611 
+Q 1082 2509 1139 2368 
+L 1792 730 
+L 2426 2387 
+Q 2464 2483 2464 2579 
+Q 2464 2758 2163 2784 
+L 2163 2880 
+L 3053 2880 
+z
+" transform="scale(0.015625)"/>
+      <path id="tworatemodel-STIXGeneral-Regular-5c" d="M 3040 2880 
+L 3040 2784 
+Q 2925 2771 2854 2700 
+Q 2784 2630 2720 2458 
+L 1760 -160 
+Q 1510 -838 1257 -1116 
+Q 1005 -1395 640 -1395 
+Q 435 -1395 313 -1289 
+Q 192 -1184 192 -1024 
+Q 192 -902 272 -816 
+Q 352 -730 467 -730 
+Q 653 -730 800 -813 
+Q 883 -858 966 -858 
+Q 1101 -858 1286 -576 
+Q 1376 -448 1459 -211 
+Q 1542 26 1542 115 
+Q 1542 198 1274 762 
+L 429 2566 
+Q 346 2752 90 2790 
+L 90 2880 
+L 1402 2880 
+L 1402 2784 
+Q 1197 2778 1117 2739 
+Q 1037 2701 1037 2611 
+Q 1037 2541 1120 2349 
+L 1837 749 
+L 2458 2515 
+Q 2483 2573 2483 2630 
+Q 2483 2784 2189 2784 
+L 2189 2880 
+L 3040 2880 
+z
+" transform="scale(0.015625)"/>
+     </defs>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-55"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-48" transform="translate(33.09375 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-46" transform="translate(77.5 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(121.90625 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-59" transform="translate(169.703125 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-48" transform="translate(217.296875 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-55" transform="translate(261.703125 0)"/>
+     <use xlink:href="#tworatemodel-STIXGeneral-Regular-5c" transform="translate(297.09375 0)"/>
+    </g>
+   </g>
+   <g id="tworatemodel-legend_1">
+    <g id="tworatemodel-line2d_17">
+     <path d="M 54.715 125.997053 
+L 64.215 125.997053 
+L 73.715 125.997053 
+" style="fill: none; stroke: var(--fg); stroke-width: 2.2; stroke-linecap: square"/>
+    </g>
+    <g id="tworatemodel-text_19">
+     <!-- net adaptation $x = x_f + x_s$ -->
+     <g style="fill: var(--fg)" transform="translate(81.315 129.322053) scale(0.095 -0.095)">
+      <defs>
+       <path id="tworatemodel-STIXGeneral-Italic-5b" d="M 1555 2272 
+L 1632 1907 
+Q 1971 2426 2179 2624 
+Q 2387 2822 2598 2822 
+Q 2714 2822 2787 2755 
+Q 2861 2688 2861 2585 
+Q 2861 2483 2800 2419 
+Q 2739 2355 2643 2355 
+Q 2586 2355 2490 2409 
+Q 2394 2464 2310 2464 
+Q 2125 2464 1683 1690 
+Q 1683 1606 1734 1402 
+L 1939 544 
+Q 2003 282 2131 282 
+Q 2234 282 2432 538 
+Q 2451 563 2476 598 
+Q 2502 634 2521 662 
+Q 2541 691 2566 717 
+L 2662 659 
+Q 2387 230 2227 80 
+Q 2067 -70 1882 -70 
+Q 1728 -70 1645 26 
+Q 1562 122 1504 365 
+L 1318 1126 
+L 755 365 
+Q 557 96 432 13 
+Q 307 -70 147 -70 
+Q 0 -70 -86 0 
+Q -173 70 -173 198 
+Q -173 294 -112 361 
+Q -51 429 45 429 
+Q 122 429 250 358 
+Q 346 301 416 301 
+Q 525 301 742 614 
+L 1267 1357 
+L 1088 2150 
+Q 1024 2432 969 2509 
+Q 915 2586 794 2586 
+Q 717 2586 544 2541 
+L 429 2509 
+L 410 2611 
+L 480 2637 
+Q 992 2822 1229 2822 
+Q 1350 2822 1420 2707 
+Q 1491 2592 1555 2272 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-20" d="M 4077 2048 
+L 307 2048 
+L 307 2470 
+L 4077 2470 
+L 4077 2048 
+z
+M 4077 768 
+L 307 768 
+L 307 1190 
+L 4077 1190 
+L 4077 768 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Italic-49" d="M 262 2739 
+L 858 2739 
+Q 1107 3546 1318 3846 
+Q 1664 4339 2163 4339 
+Q 2400 4339 2557 4227 
+Q 2714 4115 2714 3942 
+Q 2714 3834 2634 3750 
+Q 2554 3667 2445 3667 
+Q 2355 3667 2281 3737 
+Q 2208 3808 2208 3917 
+Q 2208 3981 2240 4038 
+Q 2272 4096 2272 4115 
+Q 2272 4198 2131 4198 
+Q 1862 4198 1676 3849 
+Q 1491 3501 1350 2739 
+L 2035 2739 
+L 1997 2534 
+L 1306 2534 
+L 845 486 
+Q 435 -1325 -435 -1325 
+Q -653 -1325 -797 -1213 
+Q -941 -1101 -941 -934 
+Q -941 -826 -870 -746 
+Q -800 -666 -698 -666 
+Q -589 -666 -521 -733 
+Q -454 -800 -454 -902 
+Q -454 -947 -483 -1001 
+Q -512 -1056 -512 -1088 
+Q -512 -1190 -384 -1190 
+Q 13 -1190 237 -154 
+L 800 2534 
+L 218 2534 
+L 262 2739 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Regular-e" d="M 4070 1408 
+L 2400 1408 
+L 2400 -262 
+L 1978 -262 
+L 1978 1408 
+L 307 1408 
+L 307 1830 
+L 1978 1830 
+L 1978 3501 
+L 2400 3501 
+L 2400 1830 
+L 4070 1830 
+L 4070 1408 
+z
+" transform="scale(0.015625)"/>
+       <path id="tworatemodel-STIXGeneral-Italic-56" d="M 2342 2829 
+L 2214 1933 
+L 2112 1933 
+Q 2022 2675 1542 2675 
+Q 1370 2675 1267 2579 
+Q 1165 2483 1165 2310 
+Q 1165 2067 1510 1658 
+Q 1946 1152 1946 787 
+Q 1946 397 1686 163 
+Q 1427 -70 1024 -70 
+Q 838 -70 672 -6 
+Q 538 51 390 51 
+Q 262 51 205 -83 
+L 102 -83 
+L 230 934 
+L 333 934 
+Q 461 64 973 64 
+Q 1203 64 1331 192 
+Q 1459 320 1459 557 
+Q 1459 845 1101 1293 
+Q 698 1798 698 2131 
+Q 698 2451 909 2636 
+Q 1120 2822 1472 2822 
+Q 1600 2822 1830 2758 
+Q 1971 2714 2061 2714 
+Q 2189 2714 2253 2829 
+L 2342 2829 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-51" transform="translate(0 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-48" transform="translate(49.999954 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(94.399918 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-3" transform="translate(122.19989 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(147.19986 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-47" transform="translate(191.599823 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(241.599777 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-53" transform="translate(285.999741 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(335.999695 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(363.799667 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(408.199631 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-4c" transform="translate(435.999603 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(463.799576 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-51" transform="translate(513.79953 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-3" transform="translate(563.799484 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-5b" transform="translate(588.799454 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-20" transform="translate(653.199417 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-5b" transform="translate(741.699356 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-49" transform="translate(786.099319 -14.296875) scale(0.7)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-e" transform="translate(830.0593 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-5b" transform="translate(918.559239 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-56" transform="translate(962.959203 -14.296875) scale(0.7)"/>
+     </g>
+    </g>
+    <g id="tworatemodel-line2d_18">
+     <path d="M 54.715 140.722053 
+L 64.215 140.722053 
+L 73.715 140.722053 
+" style="fill: none; stroke-dasharray: 5.6,2.8; stroke-dashoffset: 0; stroke: var(--hover); stroke-width: 1.4"/>
+    </g>
+    <g id="tworatemodel-text_20">
+     <!-- fast state $x_f$ -->
+     <g style="fill: var(--fg)" transform="translate(81.315 144.047053) scale(0.095 -0.095)">
+      <defs>
+       <path id="tworatemodel-STIXGeneral-Regular-49" d="M 134 2880 
+L 659 2880 
+Q 666 3264 710 3478 
+Q 755 3693 883 3910 
+Q 1152 4371 1786 4371 
+Q 2074 4371 2262 4259 
+Q 2451 4147 2451 3974 
+Q 2451 3866 2374 3789 
+Q 2298 3712 2182 3712 
+Q 2029 3712 1894 3942 
+Q 1741 4192 1555 4192 
+Q 1197 4192 1197 3622 
+L 1197 2880 
+L 1978 2880 
+L 1978 2675 
+L 1197 2675 
+L 1197 666 
+Q 1197 307 1299 208 
+Q 1402 109 1792 96 
+L 1792 0 
+L 128 0 
+L 128 96 
+Q 474 115 566 214 
+Q 659 314 659 666 
+L 659 2675 
+L 134 2675 
+L 134 2880 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-49" transform="translate(0 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(33.299973 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-56" transform="translate(77.699936 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(116.599899 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-3" transform="translate(144.399872 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-56" transform="translate(169.399841 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(208.299805 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(236.099777 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(280.499741 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-48" transform="translate(308.299713 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-3" transform="translate(352.699677 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-5b" transform="translate(377.699646 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-49" transform="translate(422.099609 -14.296875) scale(0.7)"/>
+     </g>
+    </g>
+    <g id="tworatemodel-line2d_19">
+     <path d="M 54.715 155.447053 
+L 64.215 155.447053 
+L 73.715 155.447053 
+" style="fill: none; stroke-dasharray: 5.6,2.8; stroke-dashoffset: 0; stroke: var(--accent); stroke-width: 1.4"/>
+    </g>
+    <g id="tworatemodel-text_21">
+     <!-- slow state $x_s$ -->
+     <g style="fill: var(--fg)" transform="translate(81.315 158.772053) scale(0.095 -0.095)">
+      <defs>
+       <path id="tworatemodel-STIXGeneral-Regular-5a" d="M 4442 2880 
+L 4442 2784 
+Q 4346 2752 4301 2691 
+Q 4256 2630 4179 2438 
+L 3296 224 
+Q 3168 -90 3117 -90 
+Q 3085 -90 3062 -48 
+Q 3040 -6 2963 186 
+L 2381 1696 
+L 1664 160 
+Q 1549 -90 1504 -90 
+Q 1446 -90 1338 192 
+L 474 2381 
+Q 378 2630 314 2700 
+Q 250 2771 134 2784 
+L 134 2880 
+L 1286 2880 
+L 1286 2784 
+Q 1120 2765 1056 2720 
+Q 992 2675 992 2573 
+Q 992 2477 1030 2381 
+L 1664 710 
+L 2246 1984 
+L 2118 2342 
+Q 2029 2598 1942 2681 
+Q 1856 2765 1677 2784 
+L 1677 2880 
+L 2976 2880 
+L 2976 2784 
+Q 2752 2752 2678 2707 
+Q 2605 2662 2605 2560 
+Q 2605 2458 2714 2176 
+L 3251 742 
+L 3827 2163 
+Q 3936 2432 3936 2592 
+Q 3936 2669 3875 2710 
+Q 3814 2752 3654 2784 
+L 3654 2880 
+L 4442 2880 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-56" transform="translate(0 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-4f" transform="translate(38.899963 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-52" transform="translate(66.699936 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-5a" transform="translate(116.69989 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-3" transform="translate(188.899826 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-56" transform="translate(213.899796 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(252.799759 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-44" transform="translate(280.599731 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-57" transform="translate(324.999695 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-48" transform="translate(352.799667 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Regular-3" transform="translate(397.199631 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-5b" transform="translate(422.1996 0.703125)"/>
+      <use xlink:href="#tworatemodel-STIXGeneral-Italic-56" transform="translate(466.599564 -14.296875) scale(0.7)"/>
+     </g>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="tworatemodel-p37c3c79d3f">
+   <rect x="46.165" y="3.377053" width="368.28" height="166.32"/>
+  </clipPath>
+ </defs>
+</svg>
+
+      <figcaption><b>Figure 1.</b> The two-rate model of Smith et al. (2006) with the paper's parameters, rerun: adaptation, a short de-adaptation, then an error clamp. The net output recovers toward the first adaptation as the fast state decays and the slow state remains.</figcaption>
+    </figure>
+    <figure class="fig paper">
+      <img src="img/smith2006-fig1.jpg" alt="Smith et al. 2006 model comparison" loading="lazy">
+      <figcaption><b>Figure 2.</b> Single-state, gain-specific and multi-rate models compared on a relearning paradigm. Only the models with more than one state show savings after washout (E). Reproduced from Smith, Ghazizadeh and Shadmehr, <i>PLoS Biol.</i> 4(6):e179, 2006, <a href="https://doi.org/10.1371/journal.pbio.0040179">doi:10.1371/journal.pbio.0040179</a>, CC BY.</figcaption>
+    </figure>
+
+    <h2>5. The same ideas in robot learning</h2>
+    <ul>
+      <li><b>Forward models.</b> Learned world models predict the consequences of actions and are used for planning
+      or for training a policy in imagination; state estimators fuse a dynamics model with sensors exactly as in
+      Section 2.</li>
+      <li><b>Fast adaptation of a latent.</b> Rapid Motor Adaptation (Kumar et al., RSS 2021) learns, in simulation, a
+      policy conditioned on hidden physical parameters, then infers those parameters online from recent state–action
+      history. That is a fast process on top of slowly learned weights. My
+      <a href="lit-adaptation.html">adaptation review</a> covers its descendants.</li>
+      <li><b>Mixtures and context.</b> Context-conditioned and mixture-of-expert policies select behaviour by how
+      well each mode explains the present, the MOSAIC idea with neural networks.</li>
+    </ul>
+
+    <h2>6. What robotics has not taken yet</h2>
+    <ul>
+      <li><b>Two timescales with different forgetting.</b> Robot adaptation modules usually have one memory. The
+      two-rate structure predicts, and explains, both quick reversibility and long retention; an online adapter
+      with an explicit fast-forgetting and slow-retaining split is a small, testable change.</li>
+      <li><b>Responsibility from prediction error.</b> Gating by forward-model accuracy is a principled way to switch
+      dynamics models when a robot grasps a new object, and it is measurable on the robot's own sensors.</li>
+      <li><b>After-effects as a test.</b> Switching a perturbation off and looking for mirror-image errors is a clean
+      way to tell whether a robot learned a model of the disturbance or merely stiffened against it.</li>
+    </ul>
+
+    <h2>References</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Reference</th><th>Venue</th></tr>
+      <tr><td>Shadmehr, Mussa-Ivaldi, <a href="https://doi.org/10.1523/JNEUROSCI.14-05-03208.1994">Adaptive representation of dynamics during learning of a motor task</a></td><td>J. Neurosci. 14, 1994</td></tr>
+      <tr><td>Wolpert, Ghahramani, Jordan, <a href="https://doi.org/10.1126/science.7569931">An internal model for sensorimotor integration</a></td><td>Science 269, 1995</td></tr>
+      <tr><td>Wolpert, Kawato, <a href="https://doi.org/10.1016/S0893-6080(98)00066-5">Multiple paired forward and inverse models for motor control</a></td><td>Neural Networks 11, 1998</td></tr>
+      <tr><td>Wolpert, Miall, Kawato, <a href="https://doi.org/10.1016/S1364-6613(98)01221-2">Internal models in the cerebellum</a></td><td>Trends Cogn. Sci. 2, 1998</td></tr>
+      <tr><td>Smith, Ghazizadeh, Shadmehr, <a href="https://doi.org/10.1371/journal.pbio.0040179">Interacting adaptive processes with different timescales underlie short-term motor learning</a></td><td>PLoS Biol. 4, 2006</td></tr>
+      <tr><td>Kumar et al., <a href="https://arxiv.org/abs/2107.04034">RMA: Rapid Motor Adaptation for Legged Robots</a></td><td>RSS 2021</td></tr>
+    </table></div>
+  </article>
+</body>
+</html>

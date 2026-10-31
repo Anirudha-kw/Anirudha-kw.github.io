@@ -1,0 +1,1683 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synergies and Motor Primitives · Anirudha Karande</title>
+  <meta name="description" content="Spinal force fields, muscle and hand synergies, eigengrasps and dynamic movement primitives.">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+  <link rel="stylesheet" href="../style.css?v=5">
+  <script src="../theme.js?v=5"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\(', right: '\\)', display: false}]})"></script>
+</head>
+<body>
+  <article class="post">
+    <div class="post-top"><a class="back" href="../index.html">&larr; Anirudha Karande</a><button class="theme-toggle" type="button" aria-label="Switch between light and dark"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button></div>
+    <h1>Synergies and Motor Primitives</h1>
+    <p class="meta">[Literature Review]</p>
+<p class="note">Part of a series on sensorimotor neuroscience and robot learning: <a href="lit-human-impedance.html">impedance</a> · <a href="lit-internal-models.html">internal models</a> · <a href="lit-optimal-feedback.html">optimal feedback control</a> · <a href="lit-touch-grip.html">touch and grip</a> · <a href="lit-synergies.html">synergies and primitives</a> · <a href="lit-population-dynamics.html">population dynamics</a>.</p>
+    <div class="tldr"><p>The hand has more than twenty degrees of freedom and the arm and body many more, yet movements
+    are coordinated as if far fewer variables were in play. Neuroscience found low-dimensional structure at several
+    levels: spinal force fields that add like vectors, muscle synergies that combine into natural behaviours, and hand
+    postures that live near a plane. Robotics turned the same idea into eigengrasps, underactuated hands and movement
+    primitives.</p></div>
+
+    <h2>1. Force fields that add</h2>
+    <p>Bizzi, Mussa-Ivaldi and Giszter (1991) stimulated the spinal cord of frogs and measured the force the leg
+    produced at many positions. Each stimulation site produced a convergent force field, pulling the limb toward an
+    equilibrium posture. Stimulating two sites together produced, approximately, the vector sum of the two fields.
+    A small set of fields, combined linearly, could in principle span a large repertoire of movements.</p>
+
+    <h2>2. Muscle synergies</h2>
+    <p>d'Avella, Saltiel and Bizzi (2003) went from stimulation to natural behaviour. Recording many muscles in frogs
+    during kicking, they decomposed the activity into a few time-varying synergies, fixed spatiotemporal patterns of
+    muscle activation, each scaled in amplitude and shifted in time. A small number of synergies reconstructed the
+    natural behaviour. The decomposition is a factorisation of the form</p>
+    $$m(t) \approx \sum_{i=1}^{k} c_i\, w_i(t - t_i),$$
+    <p>with \(k\) much smaller than the number of muscles.</p>
+
+    <h2>3. Postural hand synergies</h2>
+    <p>Santello, Flanders and Soechting (1998) recorded 15 joint angles of the hand while subjects shaped it to grasp
+    57 imagined objects. Principal components analysis showed that the first two components accounted for more than
+    80% of the variance. The first component is a coordinated flexion of the knuckles of all fingers, with finger
+    adduction and thumb rotation: the whole hand closing at once. The second reshapes the fingers while the thumb
+    repeats the same pattern. Higher components were small but carried information about the object, so the
+    low-dimensional description is a backbone, not the whole story.</p>
+    <figure class="fig paper">
+      <img src="img/santello1998-fig6.jpg" alt="Postural hand synergies" loading="lazy">
+      <figcaption><b>Figure 1.</b> Hand postures along the first two principal components around the average posture, for one subject. Reproduced from Santello, Flanders and Soechting, <i>J. Neurosci.</i> 18(23):10105–10115, 1998, <a href="https://doi.org/10.1523/JNEUROSCI.18-23-10105.1998">doi:10.1523/JNEUROSCI.18-23-10105.1998</a>, CC BY-NC-SA 4.0.</figcaption>
+    </figure>
+
+    <h2>4. Synergies in robot hands</h2>
+    <p>Ciocarlie and Allen (IJRR 2009) used low-dimensional "eigengrasp" subspaces to plan grasps for dexterous robot
+    hands, searching a handful of synergy amplitudes instead of every joint. Catalano et al. (IJRR 2014) built the
+    idea into hardware: the Pisa/IIT SoftHand has a single actuator driving an adaptive synergy, and the compliant
+    transmission lets the fingers conform to the object. The synergy sets the default shape; contact and compliance
+    fill in the rest, which is close to Santello's backbone-plus-detail picture.</p>
+
+    <h2>5. Movement primitives as attractors</h2>
+    <p>Dynamic movement primitives (Ijspeert et al., Neural Computation 2013) are the trajectory-level cousin. Each
+    degree of freedom is a stable spring–damper pulled toward a goal \(g\), plus a learned forcing term that shapes
+    the path and vanishes as a phase variable \(s\) decays:</p>
+    $$\tau\dot z = \alpha_z\big(\beta_z(g - y) - z\big) + f(s)\,(g - y_0), \qquad \tau\dot y = z, \qquad \tau\dot s = -\alpha_s s,$$
+    $$f(s) = \frac{\sum_i \psi_i(s)\, w_i}{\sum_i \psi_i(s)}\, s .$$
+    <p>The weights \(w_i\) are fit to one demonstration by linear regression. Because the forcing term fades, the
+    system always converges to the goal; because it is scaled by \(g - y_0\), the same weights produce the same shape
+    for new goals; and because it is a dynamical system, a push is absorbed rather than replayed (Figure 2).</p>
+    <figure class="fig">
+<svg role="img" aria-label="Dynamic movement primitives generalising to new goals" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 259.151434 238.344" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ 
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="dynamicmovem-figure_1">
+  <g id="dynamicmovem-patch_1">
+   <path d="M 0 238.344 
+L 259.151434 238.344 
+L 259.151434 0 
+L 0 0 
+L 0 238.344 
+z
+" style="fill: none"/>
+  </g>
+  <g id="dynamicmovem-axes_1">
+   <g id="dynamicmovem-patch_2">
+    <path d="M 38.63 202.464 
+L 256.271434 202.464 
+L 256.271434 2.88 
+L 38.63 2.88 
+L 38.63 202.464 
+z
+" style="fill: none"/>
+   </g>
+   <g id="dynamicmovem-matplotlib.axis_1">
+    <g id="dynamicmovem-xtick_1">
+     <g id="dynamicmovem-line2d_1">
+      <defs>
+       <path id="dynamicmovem-m024abe6c87" d="M 0 0 
+L 0 3.5 
+" style="stroke: var(--muted); stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#dynamicmovem-m024abe6c87" x="45.884714" y="202.464" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_1">
+      <!-- 0.00 -->
+      <g style="fill: var(--fg)" transform="translate(36.259714 217.714) scale(0.11 -0.11)">
+       <defs>
+        <path id="dynamicmovem-STIXGeneral-Regular-13" d="M 3046 2112 
+Q 3046 1683 2963 1302 
+Q 2880 922 2717 602 
+Q 2554 282 2266 96 
+Q 1978 -90 1600 -90 
+Q 1210 -90 915 108 
+Q 621 307 461 640 
+Q 301 973 227 1350 
+Q 154 1728 154 2150 
+Q 154 2746 301 3222 
+Q 448 3699 790 4012 
+Q 1133 4326 1626 4326 
+Q 2253 4326 2649 3712 
+Q 3046 3098 3046 2112 
+z
+M 2432 2080 
+Q 2432 3091 2217 3625 
+Q 2003 4160 1587 4160 
+Q 1190 4160 979 3622 
+Q 768 3085 768 2106 
+Q 768 1120 979 598 
+Q 1190 77 1600 77 
+Q 2003 77 2217 598 
+Q 2432 1120 2432 2080 
+z
+" transform="scale(0.015625)"/>
+        <path id="dynamicmovem-STIXGeneral-Regular-11" d="M 1158 275 
+Q 1158 134 1052 32 
+Q 947 -70 800 -70 
+Q 653 -70 550 32 
+Q 448 134 448 281 
+Q 448 429 553 534 
+Q 659 640 806 640 
+Q 947 640 1052 531 
+Q 1158 422 1158 275 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(75 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(125 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-xtick_2">
+     <g id="dynamicmovem-line2d_2">
+      <g>
+       <use xlink:href="#dynamicmovem-m024abe6c87" x="82.158287" y="202.464" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_2">
+      <!-- 0.25 -->
+      <g style="fill: var(--fg)" transform="translate(72.533287 217.714) scale(0.11 -0.11)">
+       <defs>
+        <path id="dynamicmovem-STIXGeneral-Regular-15" d="M 3034 877 
+L 2688 0 
+L 186 0 
+L 186 77 
+L 1325 1286 
+Q 1773 1754 1965 2144 
+Q 2157 2534 2157 2950 
+Q 2157 3379 1920 3616 
+Q 1683 3853 1267 3853 
+Q 922 3853 720 3673 
+Q 518 3494 326 3021 
+L 192 3053 
+Q 301 3648 630 3987 
+Q 960 4326 1523 4326 
+Q 2054 4326 2380 4006 
+Q 2707 3686 2707 3200 
+Q 2707 2477 1888 1613 
+L 832 486 
+L 2330 486 
+Q 2541 486 2665 569 
+Q 2790 653 2944 915 
+L 3034 877 
+z
+" transform="scale(0.015625)"/>
+        <path id="dynamicmovem-STIXGeneral-Regular-18" d="M 2803 4358 
+L 2573 3814 
+Q 2534 3731 2400 3731 
+L 1158 3731 
+L 902 3187 
+Q 1606 3053 1920 2896 
+Q 2234 2739 2502 2368 
+Q 2726 2061 2726 1555 
+Q 2726 1094 2576 780 
+Q 2426 467 2099 224 
+Q 1664 -90 1011 -90 
+Q 646 -90 422 19 
+Q 198 128 198 307 
+Q 198 550 486 550 
+Q 717 550 960 352 
+Q 1210 147 1414 147 
+Q 1747 147 2012 480 
+Q 2278 813 2278 1229 
+Q 2278 1843 1850 2189 
+Q 1293 2637 486 2637 
+Q 410 2637 410 2688 
+L 416 2720 
+L 1114 4237 
+L 2438 4237 
+Q 2547 4237 2608 4269 
+Q 2669 4301 2746 4403 
+L 2803 4358 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-15" transform="translate(75 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-18" transform="translate(125 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-xtick_3">
+     <g id="dynamicmovem-line2d_3">
+      <g>
+       <use xlink:href="#dynamicmovem-m024abe6c87" x="118.431859" y="202.464" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_3">
+      <!-- 0.50 -->
+      <g style="fill: var(--fg)" transform="translate(108.806859 217.714) scale(0.11 -0.11)">
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-18" transform="translate(75 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(125 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-xtick_4">
+     <g id="dynamicmovem-line2d_4">
+      <g>
+       <use xlink:href="#dynamicmovem-m024abe6c87" x="154.705432" y="202.464" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_4">
+      <!-- 0.75 -->
+      <g style="fill: var(--fg)" transform="translate(145.080432 217.714) scale(0.11 -0.11)">
+       <defs>
+        <path id="dynamicmovem-STIXGeneral-Regular-1a" d="M 2874 4134 
+L 1517 -51 
+L 1101 -51 
+L 2368 3763 
+L 992 3763 
+Q 717 3763 582 3667 
+Q 448 3571 243 3238 
+L 128 3296 
+L 512 4237 
+L 2874 4237 
+L 2874 4134 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-1a" transform="translate(75 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-18" transform="translate(125 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-xtick_5">
+     <g id="dynamicmovem-line2d_5">
+      <g>
+       <use xlink:href="#dynamicmovem-m024abe6c87" x="190.979004" y="202.464" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_5">
+      <!-- 1.00 -->
+      <g style="fill: var(--fg)" transform="translate(181.354004 217.714) scale(0.11 -0.11)">
+       <defs>
+        <path id="dynamicmovem-STIXGeneral-Regular-14" d="M 2522 0 
+L 755 0 
+L 755 96 
+Q 1107 115 1235 227 
+Q 1363 339 1363 608 
+L 1363 3482 
+Q 1363 3795 1171 3795 
+Q 1082 3795 883 3718 
+L 710 3654 
+L 710 3744 
+L 1856 4326 
+L 1914 4307 
+L 1914 486 
+Q 1914 275 2042 185 
+Q 2170 96 2522 96 
+L 2522 0 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-14"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(75 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(125 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-xtick_6">
+     <g id="dynamicmovem-line2d_6">
+      <g>
+       <use xlink:href="#dynamicmovem-m024abe6c87" x="227.252576" y="202.464" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_6">
+      <!-- 1.25 -->
+      <g style="fill: var(--fg)" transform="translate(217.627576 217.714) scale(0.11 -0.11)">
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-14"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-15" transform="translate(75 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-18" transform="translate(125 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-text_7">
+     <!-- $y_1$ -->
+     <g style="fill: var(--fg)" transform="translate(142.830717 232.714) scale(0.11 -0.11)">
+      <defs>
+       <path id="dynamicmovem-STIXGeneral-Italic-5c" d="M 1555 1190 
+L 1690 486 
+Q 2118 1190 2294 1558 
+Q 2470 1926 2470 2131 
+Q 2470 2234 2304 2336 
+Q 2138 2445 2138 2586 
+Q 2138 2688 2211 2755 
+Q 2285 2822 2394 2822 
+Q 2534 2822 2630 2720 
+Q 2726 2618 2726 2470 
+Q 2726 1914 1888 518 
+Q 1389 -307 918 -812 
+Q 448 -1318 173 -1318 
+Q 26 -1318 -64 -1241 
+Q -154 -1165 -154 -1043 
+Q -154 -934 -80 -860 
+Q -6 -787 96 -787 
+Q 218 -787 314 -876 
+Q 410 -966 486 -966 
+Q 602 -966 794 -755 
+Q 877 -672 1040 -457 
+Q 1203 -243 1248 -173 
+Q 1312 -45 1312 51 
+Q 1312 243 1113 1046 
+Q 915 1850 787 2176 
+Q 698 2413 592 2499 
+Q 486 2586 294 2586 
+Q 192 2586 96 2560 
+L 96 2669 
+Q 237 2694 301 2707 
+Q 563 2758 986 2822 
+L 1011 2822 
+Q 1082 2822 1277 2227 
+Q 1472 1632 1555 1190 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Italic-5c" transform="translate(0 0.90625)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-14" transform="translate(44.399963 -14.09375) scale(0.7)"/>
+     </g>
+    </g>
+   </g>
+   <g id="dynamicmovem-matplotlib.axis_2">
+    <g id="dynamicmovem-ytick_1">
+     <g id="dynamicmovem-line2d_7">
+      <defs>
+       <path id="dynamicmovem-ma4b3913989" d="M 0 0 
+L -3.5 0 
+" style="stroke: var(--muted); stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#dynamicmovem-ma4b3913989" x="38.63" y="193.392" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_8">
+      <!-- 0.0 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 197.517) scale(0.11 -0.11)">
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-ytick_2">
+     <g id="dynamicmovem-line2d_8">
+      <g>
+       <use xlink:href="#dynamicmovem-ma4b3913989" x="38.63" y="164.373142" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_9">
+      <!-- 0.2 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 168.498142) scale(0.11 -0.11)">
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-15" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-ytick_3">
+     <g id="dynamicmovem-line2d_9">
+      <g>
+       <use xlink:href="#dynamicmovem-ma4b3913989" x="38.63" y="135.354284" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_10">
+      <!-- 0.4 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 139.479284) scale(0.11 -0.11)">
+       <defs>
+        <path id="dynamicmovem-STIXGeneral-Regular-17" d="M 3027 1069 
+L 2368 1069 
+L 2368 0 
+L 1869 0 
+L 1869 1069 
+L 77 1069 
+L 77 1478 
+L 2086 4326 
+L 2368 4326 
+L 2368 1478 
+L 3027 1478 
+L 3027 1069 
+z
+M 1869 1478 
+L 1869 3674 
+L 333 1478 
+L 1869 1478 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-17" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-ytick_4">
+     <g id="dynamicmovem-line2d_10">
+      <g>
+       <use xlink:href="#dynamicmovem-ma4b3913989" x="38.63" y="106.335426" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_11">
+      <!-- 0.6 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 110.460426) scale(0.11 -0.11)">
+       <defs>
+        <path id="dynamicmovem-STIXGeneral-Regular-19" d="M 2854 4378 
+L 2867 4275 
+Q 2112 4154 1606 3664 
+Q 1101 3174 973 2451 
+Q 1344 2739 1786 2739 
+Q 2349 2739 2672 2380 
+Q 2995 2022 2995 1402 
+Q 2995 774 2669 378 
+Q 2291 -90 1651 -90 
+Q 870 -90 518 557 
+Q 218 1107 218 1786 
+Q 218 2835 915 3552 
+Q 1312 3962 1731 4131 
+Q 2150 4301 2854 4378 
+z
+M 2419 1203 
+Q 2419 2445 1555 2445 
+Q 1235 2445 1024 2275 
+Q 813 2106 813 1702 
+Q 813 954 1046 522 
+Q 1280 90 1722 90 
+Q 2061 90 2240 394 
+Q 2419 698 2419 1203 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-19" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-ytick_5">
+     <g id="dynamicmovem-line2d_11">
+      <g>
+       <use xlink:href="#dynamicmovem-ma4b3913989" x="38.63" y="77.316568" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_12">
+      <!-- 0.8 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 81.441568) scale(0.11 -0.11)">
+       <defs>
+        <path id="dynamicmovem-STIXGeneral-Regular-1b" d="M 2848 992 
+Q 2848 499 2505 204 
+Q 2163 -90 1587 -90 
+Q 1050 -90 704 204 
+Q 358 499 358 954 
+Q 358 1293 524 1533 
+Q 691 1773 1190 2125 
+Q 710 2522 553 2765 
+Q 397 3008 397 3328 
+Q 397 3782 745 4054 
+Q 1094 4326 1638 4326 
+Q 2106 4326 2410 4060 
+Q 2714 3795 2714 3411 
+Q 2714 3059 2531 2848 
+Q 2349 2637 1856 2374 
+Q 2432 1990 2640 1689 
+Q 2848 1389 2848 992 
+z
+M 2272 3411 
+Q 2272 3744 2086 3945 
+Q 1901 4147 1574 4147 
+Q 1248 4147 1059 3977 
+Q 870 3808 870 3513 
+Q 870 3219 1059 2979 
+Q 1248 2739 1670 2490 
+Q 1997 2682 2134 2896 
+Q 2272 3110 2272 3411 
+z
+M 1734 1741 
+L 1357 1997 
+Q 1075 1766 960 1545 
+Q 845 1325 845 1011 
+Q 845 576 1065 333 
+Q 1286 90 1658 90 
+Q 1971 90 2166 285 
+Q 2362 480 2362 794 
+Q 2362 1082 2214 1299 
+Q 2067 1517 1734 1741 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-1b" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-ytick_6">
+     <g id="dynamicmovem-line2d_12">
+      <g>
+       <use xlink:href="#dynamicmovem-ma4b3913989" x="38.63" y="48.297711" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_13">
+      <!-- 1.0 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 52.422711) scale(0.11 -0.11)">
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-14"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-ytick_7">
+     <g id="dynamicmovem-line2d_13">
+      <g>
+       <use xlink:href="#dynamicmovem-ma4b3913989" x="38.63" y="19.278853" style="fill: var(--muted); stroke: var(--muted); stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="dynamicmovem-text_14">
+      <!-- 1.2 -->
+      <g style="fill: var(--fg)" transform="translate(17.88 23.403853) scale(0.11 -0.11)">
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-14"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(50 0)"/>
+       <use xlink:href="#dynamicmovem-STIXGeneral-Regular-15" transform="translate(75 0)"/>
+      </g>
+     </g>
+    </g>
+    <g id="dynamicmovem-text_15">
+     <!-- $y_2$ -->
+     <g style="fill: var(--fg)" transform="translate(11.13 107.292) rotate(-90) scale(0.11 -0.11)">
+      <use xlink:href="#dynamicmovem-STIXGeneral-Italic-5c" transform="translate(0 0.90625)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-15" transform="translate(44.399963 -14.09375) scale(0.7)"/>
+     </g>
+    </g>
+   </g>
+   <g id="dynamicmovem-line2d_14">
+    <path d="M 45.884714 193.392 
+L 45.994876 190.594378 
+L 46.325027 187.803849 
+L 46.874163 185.025296 
+L 47.640618 182.261218 
+L 48.622063 179.511798 
+L 49.815519 176.774997 
+L 51.434394 173.657298 
+L 53.319003 170.541419 
+L 55.461873 167.41525 
+L 58.170681 163.867782 
+L 61.534585 159.860274 
+L 65.641206 155.330624 
+L 71.435815 149.305523 
+L 85.674403 134.986662 
+L 94.605892 125.793762 
+L 102.288601 117.57053 
+L 109.600036 109.41151 
+L 116.43287 101.465732 
+L 123.283537 93.17771 
+L 130.654344 83.904118 
+L 138.446864 73.720469 
+L 147.049717 62.084016 
+L 158.588351 46.045591 
+L 170.032472 30.225467 
+L 174.972989 23.755707 
+L 178.693037 19.240956 
+L 181.401845 16.287283 
+L 183.544715 14.270565 
+L 185.208138 13.004867 
+L 186.472693 12.306992 
+L 187.410621 12.006827 
+L 188.241655 11.968288 
+L 188.828648 12.128878 
+L 189.345818 12.461667 
+L 189.89332 13.122007 
+L 190.33008 14.055644 
+L 190.655422 15.263538 
+L 190.898063 17.074858 
+L 190.979004 19.278853 
+L 190.979004 19.278853 
+" clip-path="url(#dynamicmovem-p6cfdbfdddd)" style="fill: none; stroke: var(--fg); stroke-width: 2.6; stroke-linecap: square"/>
+   </g>
+   <g id="dynamicmovem-line2d_15">
+    <path d="M 45.888104 193.379673 
+L 46.264102 192.450847 
+L 47.192036 190.757368 
+L 48.503032 188.851616 
+L 50.057141 186.976736 
+L 51.955585 185.027902 
+L 54.18817 183.046129 
+L 57.046917 180.826361 
+L 60.286883 178.592753 
+L 64.266668 176.112031 
+L 69.491931 173.119971 
+L 77.562547 168.791494 
+L 100.387251 156.6995 
+L 109.943635 151.320418 
+L 119.080079 145.914103 
+L 128.205694 140.24212 
+L 137.727008 134.043269 
+L 147.948762 127.112765 
+L 175.234046 108.415341 
+L 179.537349 105.861499 
+L 182.413262 104.382526 
+L 184.658331 103.453282 
+L 186.371247 102.966072 
+L 187.650288 102.805375 
+L 188.721347 102.897781 
+L 189.46612 103.192092 
+L 190.045562 103.693286 
+L 190.46167 104.395109 
+L 190.720508 105.286153 
+L 190.831454 106.556884 
+L 190.826816 106.964469 
+L 190.826816 106.964469 
+" clip-path="url(#dynamicmovem-p6cfdbfdddd)" style="fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: square"/>
+   </g>
+   <g id="dynamicmovem-line2d_16">
+    <defs>
+     <path id="dynamicmovem-mfe01bc346d" d="M 0 2.5 
+C 0.663008 2.5 1.29895 2.236584 1.767767 1.767767 
+C 2.236584 1.29895 2.5 0.663008 2.5 0 
+C 2.5 -0.663008 2.236584 -1.29895 1.767767 -1.767767 
+C 1.29895 -2.236584 0.663008 -2.5 0 -2.5 
+C -0.663008 -2.5 -1.29895 -2.236584 -1.767767 -1.767767 
+C -2.236584 -1.29895 -2.5 -0.663008 -2.5 0 
+C -2.5 0.663008 -2.236584 1.29895 -1.767767 1.767767 
+C -1.29895 2.236584 -0.663008 2.5 0 2.5 
+z
+" style="stroke: var(--accent)"/>
+    </defs>
+    <g clip-path="url(#dynamicmovem-p6cfdbfdddd)">
+     <use xlink:href="#dynamicmovem-mfe01bc346d" x="190.979004" y="106.335426" style="fill: var(--accent); stroke: var(--accent)"/>
+    </g>
+   </g>
+   <g id="dynamicmovem-line2d_17">
+    <path d="M 45.887426 193.372482 
+L 46.237383 191.698259 
+L 47.019592 188.937884 
+L 48.103626 185.882171 
+L 49.377943 182.895844 
+L 50.926842 179.801978 
+L 52.742013 176.660676 
+L 54.814477 173.496404 
+L 57.406449 169.959859 
+L 60.590277 166.032049 
+L 64.433742 161.66417 
+L 69.730577 156.001697 
+L 91.714408 132.856735 
+L 98.497536 125.211563 
+L 104.898735 117.6683 
+L 111.28769 109.808747 
+L 118.030729 101.164924 
+L 125.428278 91.314643 
+L 135.181897 77.919464 
+L 145.441826 63.892398 
+L 149.646466 58.497213 
+L 152.559755 55.0745 
+L 154.89168 52.662004 
+L 156.527575 51.261556 
+L 157.785201 50.446853 
+L 158.732559 50.060462 
+L 159.559238 49.96314 
+L 160.15402 50.109486 
+L 160.659677 50.475121 
+L 161.073583 51.068338 
+L 161.449551 52.07576 
+L 161.698005 53.388313 
+L 161.83313 55.288529 
+L 161.838395 56.54841 
+L 161.838395 56.54841 
+" clip-path="url(#dynamicmovem-p6cfdbfdddd)" style="fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: square"/>
+   </g>
+   <g id="dynamicmovem-line2d_18">
+    <g clip-path="url(#dynamicmovem-p6cfdbfdddd)">
+     <use xlink:href="#dynamicmovem-mfe01bc346d" x="161.960146" y="55.552425" style="fill: var(--accent); stroke: var(--accent)"/>
+    </g>
+   </g>
+   <g id="dynamicmovem-line2d_19">
+    <path d="M 45.888952 193.386864 
+L 46.358949 192.999853 
+L 47.657961 192.219864 
+L 49.756476 191.244799 
+L 52.63516 190.179769 
+L 56.264034 189.08122 
+L 61.003637 187.877725 
+L 67.453349 186.47535 
+L 76.994924 184.651961 
+L 95.95721 181.317408 
+L 118.19351 177.331539 
+L 134.51792 174.184447 
+L 150.90834 170.794124 
+L 168.169923 166.98477 
+L 194.078771 160.989302 
+L 207.571379 157.985059 
+L 214.809082 156.589418 
+L 219.351736 155.917534 
+L 222.437885 155.663602 
+L 224.599841 155.700599 
+L 225.867322 155.938405 
+L 226.533088 156.255637 
+L 226.929457 156.68123 
+L 227.063638 157.128813 
+L 227.062341 157.380529 
+L 227.062341 157.380529 
+" clip-path="url(#dynamicmovem-p6cfdbfdddd)" style="fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: square"/>
+   </g>
+   <g id="dynamicmovem-line2d_20">
+    <g clip-path="url(#dynamicmovem-p6cfdbfdddd)">
+     <use xlink:href="#dynamicmovem-mfe01bc346d" x="227.252576" y="157.118428" style="fill: var(--accent); stroke: var(--accent)"/>
+    </g>
+   </g>
+   <g id="dynamicmovem-line2d_21">
+    <path d="M 45.886579 193.382755 
+L 46.202447 192.383597 
+L 46.933973 190.724593 
+L 47.973037 188.899355 
+L 49.351177 186.954621 
+L 51.054665 184.968015 
+L 53.068699 182.963961 
+L 55.57967 180.772279 
+L 59.101871 178.012455 
+L 64.892322 173.810321 
+L 75.861109 165.872625 
+L 82.056029 161.096004 
+L 88.029266 156.20814 
+L 93.9517 151.077874 
+L 100.570914 145.039568 
+L 111.090099 135.067144 
+L 116.432921 130.17146 
+L 119.393663 127.744124 
+L 121.407316 126.369708 
+L 122.699687 125.724931 
+L 123.666309 125.467452 
+L 124.367901 125.499354 
+L 124.854487 125.742069 
+L 125.217482 126.195487 
+L 125.458936 126.851654 
+L 125.592824 127.834611 
+L 125.60287 128.571352 
+L 125.60287 128.571352 
+" clip-path="url(#dynamicmovem-p6cfdbfdddd)" style="fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: square"/>
+   </g>
+   <g id="dynamicmovem-line2d_22">
+    <g clip-path="url(#dynamicmovem-p6cfdbfdddd)">
+     <use xlink:href="#dynamicmovem-mfe01bc346d" x="125.686574" y="128.09957" style="fill: var(--accent); stroke: var(--accent)"/>
+    </g>
+   </g>
+   <g id="dynamicmovem-line2d_23">
+    <path d="M 45.888104 193.367346 
+L 46.264102 191.509693 
+L 47.085174 188.473109 
+L 48.205579 185.110876 
+L 49.681665 181.411614 
+L 51.285071 177.973292 
+L 53.155458 174.466762 
+L 55.284624 170.928039 
+L 57.665099 167.369482 
+L 60.631054 163.344994 
+L 64.266668 158.832062 
+L 68.653138 153.780313 
+L 74.316997 147.621166 
+L 84.923501 136.499251 
+L 85.942711 135.433958 
+L 86.455372 161.014513 
+L 88.525611 158.602798 
+L 91.154962 155.096547 
+L 94.365776 150.360541 
+L 98.729678 143.457236 
+L 106.544469 130.573519 
+L 119.65224 109.022128 
+L 130.468197 91.715173 
+L 143.712881 70.979968 
+L 157.023309 50.533624 
+L 165.752106 37.500163 
+L 171.513274 29.263867 
+L 175.936181 23.321754 
+L 179.228515 19.260816 
+L 181.869572 16.357008 
+L 183.701652 14.631238 
+L 185.33209 13.397735 
+L 186.566518 12.741639 
+L 187.480146 12.478253 
+L 188.288335 12.474813 
+L 188.856816 12.66649 
+L 189.353418 13.039547 
+L 189.776544 13.598764 
+L 190.20214 14.556818 
+L 190.515561 15.79035 
+L 190.748772 17.616465 
+L 190.831088 20.210639 
+L 190.826816 20.620779 
+L 190.826816 20.620779 
+" clip-path="url(#dynamicmovem-p6cfdbfdddd)" style="fill: none; stroke-dasharray: 6,3; stroke-dashoffset: 0; stroke: var(--hover); stroke-width: 1.5"/>
+   </g>
+   <g id="dynamicmovem-line2d_24"/>
+   <g id="dynamicmovem-line2d_25">
+    <defs>
+     <path id="dynamicmovem-m4e6cffb931" d="M 0 3 
+C 0.795609 3 1.55874 2.683901 2.12132 2.12132 
+C 2.683901 1.55874 3 0.795609 3 0 
+C 3 -0.795609 2.683901 -1.55874 2.12132 -2.12132 
+C 1.55874 -2.683901 0.795609 -3 0 -3 
+C -0.795609 -3 -1.55874 -2.683901 -2.12132 -2.12132 
+C -2.683901 -1.55874 -3 -0.795609 -3 0 
+C -3 0.795609 -2.683901 1.55874 -2.12132 2.12132 
+C -1.55874 2.683901 -0.795609 3 0 3 
+z
+" style="stroke: var(--fg)"/>
+    </defs>
+    <g clip-path="url(#dynamicmovem-p6cfdbfdddd)">
+     <use xlink:href="#dynamicmovem-m4e6cffb931" x="45.884714" y="193.392" style="fill: var(--fg); stroke: var(--fg)"/>
+    </g>
+   </g>
+   <g id="dynamicmovem-patch_3">
+    <path d="M 38.63 202.464 
+L 38.63 2.88 
+" style="fill: none; stroke: var(--muted); stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="dynamicmovem-patch_4">
+    <path d="M 38.63 202.464 
+L 256.271434 202.464 
+" style="fill: none; stroke: var(--muted); stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="dynamicmovem-legend_1">
+    <g id="dynamicmovem-line2d_26">
+     <path d="M 46.73 14.58 
+L 55.73 14.58 
+L 64.73 14.58 
+" style="fill: none; stroke: var(--fg); stroke-width: 2.6; stroke-linecap: square"/>
+    </g>
+    <g id="dynamicmovem-text_16">
+     <!-- demonstration -->
+     <g style="fill: var(--fg)" transform="translate(71.93 17.73) scale(0.09 -0.09)">
+      <defs>
+       <path id="dynamicmovem-STIXGeneral-Regular-47" d="M 3142 269 
+L 2202 -64 
+L 2176 -45 
+L 2176 365 
+Q 1869 -64 1357 -64 
+Q 826 -64 499 317 
+Q 173 698 173 1312 
+Q 173 1990 563 2467 
+Q 954 2944 1504 2944 
+Q 1850 2944 2176 2669 
+L 2176 3667 
+Q 2176 3866 2118 3930 
+Q 2061 3994 1882 3994 
+Q 1792 3994 1741 3987 
+L 1741 4090 
+Q 2323 4243 2682 4371 
+L 2714 4358 
+L 2714 730 
+Q 2714 506 2768 435 
+Q 2822 365 2995 365 
+Q 3034 365 3142 371 
+L 3142 269 
+z
+M 2176 653 
+L 2176 2125 
+Q 2176 2381 1981 2573 
+Q 1786 2765 1523 2765 
+Q 1158 2765 940 2438 
+Q 723 2112 723 1568 
+Q 723 979 963 624 
+Q 1203 269 1606 269 
+Q 1907 269 2080 474 
+Q 2176 582 2176 653 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-48" d="M 2611 1050 
+L 2714 1005 
+Q 2330 -64 1376 -64 
+Q 813 -64 486 329 
+Q 160 723 160 1389 
+Q 160 2074 525 2509 
+Q 890 2944 1485 2944 
+Q 2061 2944 2374 2502 
+Q 2560 2246 2592 1773 
+L 621 1773 
+Q 646 1370 700 1158 
+Q 755 947 915 730 
+Q 1184 378 1626 378 
+Q 1939 378 2153 531 
+Q 2368 685 2611 1050 
+z
+M 634 1978 
+L 1939 1978 
+Q 1882 2381 1750 2547 
+Q 1619 2714 1312 2714 
+Q 1043 2714 864 2525 
+Q 685 2336 634 1978 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-50" d="M 4960 0 
+L 3565 0 
+L 3565 96 
+Q 3834 122 3907 208 
+Q 3981 294 3981 576 
+L 3981 1894 
+Q 3981 2278 3869 2444 
+Q 3757 2611 3488 2611 
+Q 3264 2611 3107 2521 
+Q 2950 2432 2803 2221 
+L 2803 608 
+Q 2803 301 2896 201 
+Q 2989 102 3264 96 
+L 3264 0 
+L 1830 0 
+L 1830 96 
+Q 2112 115 2189 188 
+Q 2266 262 2266 550 
+L 2266 1901 
+Q 2266 2611 1850 2611 
+Q 1670 2611 1468 2531 
+Q 1267 2451 1171 2336 
+Q 1088 2240 1088 2227 
+L 1088 448 
+Q 1088 243 1177 176 
+Q 1267 109 1523 96 
+L 1523 0 
+L 102 0 
+L 102 96 
+Q 371 102 460 195 
+Q 550 288 550 563 
+L 550 2150 
+Q 550 2387 499 2480 
+Q 448 2573 326 2573 
+Q 230 2573 122 2547 
+L 122 2656 
+Q 557 2778 1011 2944 
+L 1062 2925 
+L 1062 2451 
+L 1075 2451 
+Q 1363 2752 1584 2848 
+Q 1805 2944 2054 2944 
+Q 2560 2944 2733 2406 
+Q 3232 2944 3776 2944 
+Q 4518 2944 4518 1792 
+L 4518 493 
+Q 4518 282 4582 202 
+Q 4646 122 4794 109 
+L 4960 96 
+L 4960 0 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-52" d="M 3008 1478 
+Q 3008 806 2608 371 
+Q 2208 -64 1568 -64 
+Q 979 -64 582 368 
+Q 186 800 186 1459 
+Q 186 2125 582 2534 
+Q 979 2944 1626 2944 
+Q 2221 2944 2614 2537 
+Q 3008 2131 3008 1478 
+z
+M 2432 1306 
+Q 2432 2035 2112 2445 
+Q 1856 2765 1504 2765 
+Q 1171 2765 966 2493 
+Q 762 2221 762 1747 
+Q 762 928 1101 435 
+Q 1318 115 1677 115 
+Q 2029 115 2230 432 
+Q 2432 749 2432 1306 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-51" d="M 3104 0 
+L 1773 0 
+L 1779 96 
+Q 2016 115 2096 233 
+Q 2176 352 2176 672 
+L 2176 1946 
+Q 2176 2592 1709 2592 
+Q 1549 2592 1408 2515 
+Q 1267 2438 1050 2227 
+L 1050 461 
+Q 1050 269 1136 192 
+Q 1222 115 1466 96 
+L 1466 0 
+L 115 0 
+L 115 96 
+Q 358 115 435 214 
+Q 512 314 512 602 
+L 512 2157 
+Q 512 2394 467 2483 
+Q 422 2573 288 2573 
+Q 160 2573 102 2547 
+L 102 2656 
+Q 550 2784 979 2944 
+L 1030 2925 
+L 1030 2426 
+L 1037 2426 
+Q 1491 2944 1958 2944 
+Q 2323 2944 2518 2688 
+Q 2714 2432 2714 1958 
+L 2714 544 
+Q 2714 288 2790 205 
+Q 2867 122 3104 96 
+L 3104 0 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-56" d="M 998 1926 
+L 1664 1523 
+Q 1984 1331 2105 1164 
+Q 2227 998 2227 736 
+Q 2227 416 1961 176 
+Q 1696 -64 1331 -64 
+Q 1030 -64 864 -6 
+Q 691 51 570 51 
+Q 461 51 416 -26 
+L 333 -26 
+L 333 979 
+L 435 979 
+Q 538 512 730 294 
+Q 922 77 1248 77 
+Q 1485 77 1632 211 
+Q 1779 346 1779 550 
+Q 1779 845 1440 1030 
+L 1094 1222 
+Q 326 1651 326 2150 
+Q 326 2522 566 2730 
+Q 806 2938 1210 2938 
+Q 1491 2938 1638 2867 
+Q 1754 2816 1818 2816 
+Q 1862 2816 1920 2880 
+L 1990 2880 
+L 2022 2010 
+L 1926 2010 
+Q 1818 2445 1654 2621 
+Q 1491 2797 1203 2797 
+Q 986 2797 854 2688 
+Q 723 2579 723 2362 
+Q 723 2253 796 2128 
+Q 870 2003 998 1926 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-57" d="M 1702 493 
+L 1786 422 
+Q 1478 -64 1011 -64 
+Q 448 -64 448 749 
+L 448 2675 
+L 109 2675 
+Q 83 2694 83 2720 
+Q 83 2771 192 2842 
+Q 435 2982 813 3526 
+Q 826 3546 874 3606 
+Q 922 3667 941 3706 
+Q 986 3706 986 3622 
+L 986 2880 
+L 1632 2880 
+L 1632 2675 
+L 986 2675 
+L 986 845 
+Q 986 538 1062 403 
+Q 1139 269 1318 269 
+Q 1510 269 1702 493 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-55" d="M 1024 2931 
+L 1024 2342 
+Q 1267 2688 1430 2816 
+Q 1594 2944 1792 2944 
+Q 1958 2944 2051 2854 
+Q 2144 2765 2144 2605 
+Q 2144 2470 2077 2393 
+Q 2010 2317 1894 2317 
+Q 1773 2317 1638 2445 
+Q 1536 2541 1472 2541 
+Q 1338 2541 1181 2355 
+Q 1024 2170 1024 2016 
+L 1024 576 
+Q 1024 301 1133 205 
+Q 1242 109 1568 96 
+L 1568 0 
+L 32 0 
+L 32 96 
+Q 339 154 412 224 
+Q 486 294 486 538 
+L 486 2138 
+Q 486 2349 438 2435 
+Q 390 2522 269 2522 
+Q 166 2522 45 2496 
+L 45 2598 
+Q 448 2726 992 2944 
+L 1024 2931 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-44" d="M 2829 422 
+L 2829 243 
+Q 2586 -64 2253 -64 
+Q 1888 -64 1843 403 
+L 1837 403 
+Q 1427 -64 909 -64 
+Q 608 -64 422 112 
+Q 237 288 237 602 
+Q 237 1050 685 1350 
+Q 992 1555 1837 1869 
+L 1837 2214 
+Q 1837 2502 1699 2646 
+Q 1562 2790 1338 2790 
+Q 1146 2790 1018 2697 
+Q 890 2605 890 2477 
+Q 890 2419 909 2348 
+Q 928 2278 928 2208 
+Q 928 2112 841 2029 
+Q 755 1946 634 1946 
+Q 525 1946 441 2029 
+Q 358 2112 358 2240 
+Q 358 2547 685 2752 
+Q 986 2944 1421 2944 
+Q 1939 2944 2176 2656 
+Q 2291 2522 2323 2384 
+Q 2355 2246 2355 1946 
+L 2355 723 
+Q 2355 301 2554 301 
+Q 2682 301 2829 422 
+z
+M 1837 813 
+L 1837 1715 
+Q 1248 1510 1018 1293 
+Q 800 1094 800 800 
+Q 800 557 921 432 
+Q 1043 307 1242 307 
+Q 1453 307 1613 410 
+Q 1747 506 1792 589 
+Q 1837 672 1837 813 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-4c" d="M 1152 4045 
+Q 1152 3904 1056 3811 
+Q 960 3718 819 3718 
+Q 685 3718 592 3811 
+Q 499 3904 499 4045 
+Q 499 4179 595 4275 
+Q 691 4371 826 4371 
+Q 966 4371 1059 4275 
+Q 1152 4179 1152 4045 
+z
+M 1619 0 
+L 102 0 
+L 102 96 
+Q 435 115 521 211 
+Q 608 307 608 666 
+L 608 2118 
+Q 608 2342 563 2432 
+Q 518 2522 397 2522 
+Q 243 2522 128 2490 
+L 128 2592 
+L 1120 2944 
+L 1146 2918 
+L 1146 672 
+Q 1146 314 1226 218 
+Q 1306 122 1619 96 
+L 1619 0 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-47"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-48" transform="translate(50 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-50" transform="translate(94.40625 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-52" transform="translate(172.203125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-51" transform="translate(222.203125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-56" transform="translate(272.203125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-57" transform="translate(310.3125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-55" transform="translate(338.109375 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-44" transform="translate(371.203125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-57" transform="translate(415.609375 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-4c" transform="translate(443.40625 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-52" transform="translate(471.203125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-51" transform="translate(521.203125 0)"/>
+     </g>
+    </g>
+    <g id="dynamicmovem-line2d_27">
+     <path d="M 46.73 28.08 
+L 55.73 28.08 
+L 64.73 28.08 
+" style="fill: none; stroke-dasharray: 6,3; stroke-dashoffset: 0; stroke: var(--hover); stroke-width: 1.5"/>
+    </g>
+    <g id="dynamicmovem-text_17">
+     <!-- pushed at $t = 0.35$, recovers -->
+     <g style="fill: var(--fg)" transform="translate(71.93 31.23) scale(0.09 -0.09)">
+      <defs>
+       <path id="dynamicmovem-STIXGeneral-Regular-53" d="M 1018 2931 
+L 1018 2438 
+Q 1421 2944 1939 2944 
+Q 2406 2944 2707 2560 
+Q 3008 2176 3008 1581 
+Q 3008 883 2621 409 
+Q 2234 -64 1664 -64 
+Q 1466 -64 1328 -6 
+Q 1190 51 1018 211 
+L 1018 -794 
+Q 1018 -1094 1120 -1180 
+Q 1222 -1267 1581 -1274 
+L 1581 -1389 
+L 32 -1389 
+L 32 -1280 
+Q 314 -1254 397 -1171 
+Q 480 -1088 480 -838 
+L 480 2157 
+Q 480 2381 429 2451 
+Q 378 2522 218 2522 
+Q 115 2522 58 2515 
+L 58 2618 
+Q 506 2752 979 2944 
+L 1018 2931 
+z
+M 1018 2138 
+L 1018 563 
+Q 1018 422 1238 281 
+Q 1459 141 1683 141 
+Q 2029 141 2243 467 
+Q 2458 794 2458 1325 
+Q 2458 1888 2243 2224 
+Q 2029 2560 1670 2560 
+Q 1446 2560 1232 2419 
+Q 1018 2278 1018 2138 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-58" d="M 3072 320 
+L 3072 230 
+Q 2573 96 2195 -58 
+L 2163 -38 
+L 2163 486 
+L 2150 486 
+Q 1747 -64 1235 -64 
+Q 870 -64 662 160 
+Q 454 384 454 755 
+L 454 2362 
+Q 454 2598 371 2688 
+Q 288 2778 58 2790 
+L 58 2880 
+L 992 2880 
+L 992 813 
+Q 992 595 1123 451 
+Q 1254 307 1446 307 
+Q 1760 307 1984 506 
+Q 2067 582 2099 649 
+Q 2131 717 2131 877 
+L 2131 2355 
+Q 2131 2605 2041 2678 
+Q 1952 2752 1658 2771 
+L 1658 2880 
+L 2669 2880 
+L 2669 685 
+Q 2669 461 2742 390 
+Q 2816 320 3034 320 
+L 3072 320 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-4b" d="M 3117 0 
+L 1760 0 
+L 1760 96 
+Q 2042 128 2118 224 
+Q 2195 320 2195 653 
+L 2195 1920 
+Q 2195 2598 1722 2598 
+Q 1530 2598 1370 2508 
+Q 1210 2419 1005 2195 
+L 1005 653 
+Q 1005 320 1081 224 
+Q 1158 128 1440 96 
+L 1440 0 
+L 58 0 
+L 58 96 
+Q 333 134 400 224 
+Q 467 314 467 653 
+L 467 3667 
+Q 467 3872 406 3933 
+Q 346 3994 141 3994 
+Q 83 3994 64 3987 
+L 64 4090 
+L 237 4141 
+Q 730 4288 973 4371 
+L 1005 4352 
+L 1005 2406 
+Q 1229 2694 1446 2819 
+Q 1664 2944 1946 2944 
+Q 2733 2944 2733 1926 
+L 2733 653 
+Q 2733 320 2793 233 
+Q 2854 147 3117 96 
+L 3117 0 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-3" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Italic-57" d="M 1894 2739 
+L 1862 2534 
+L 1325 2534 
+L 768 435 
+Q 755 384 755 346 
+Q 755 243 851 243 
+Q 928 243 1030 342 
+Q 1133 442 1370 749 
+L 1453 704 
+Q 1158 256 969 93 
+Q 781 -70 538 -70 
+Q 243 -70 243 166 
+Q 243 230 346 640 
+L 845 2534 
+L 365 2534 
+L 358 2573 
+Q 358 2688 570 2733 
+Q 730 2771 992 2979 
+Q 1254 3187 1421 3437 
+Q 1459 3494 1510 3494 
+Q 1568 3494 1568 3443 
+Q 1568 3411 1562 3398 
+L 1382 2739 
+L 1894 2739 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-20" d="M 4077 2048 
+L 307 2048 
+L 307 2470 
+L 4077 2470 
+L 4077 2048 
+z
+M 4077 768 
+L 307 768 
+L 307 1190 
+L 4077 1190 
+L 4077 768 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-16" d="M 390 3264 
+L 288 3290 
+Q 435 3770 748 4048 
+Q 1062 4326 1542 4326 
+Q 1990 4326 2265 4083 
+Q 2541 3840 2541 3450 
+Q 2541 2925 1946 2566 
+Q 2298 2413 2477 2227 
+Q 2758 1914 2758 1402 
+Q 2758 890 2464 506 
+Q 2246 211 1840 60 
+Q 1434 -90 979 -90 
+Q 262 -90 262 275 
+Q 262 378 339 442 
+Q 416 506 525 506 
+Q 685 506 915 339 
+Q 1197 141 1466 141 
+Q 1818 141 2058 425 
+Q 2298 710 2298 1120 
+Q 2298 1856 1632 2048 
+Q 1434 2112 979 2112 
+L 979 2202 
+Q 1338 2323 1517 2432 
+Q 2035 2726 2035 3290 
+Q 2035 3610 1852 3776 
+Q 1670 3942 1344 3942 
+Q 768 3942 390 3264 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-f" d="M 531 -902 
+L 467 -781 
+Q 998 -422 998 -96 
+Q 998 -13 909 -13 
+Q 883 -13 822 -25 
+Q 762 -38 723 -38 
+Q 352 -38 352 288 
+Q 352 454 457 553 
+Q 563 653 736 653 
+Q 954 653 1101 496 
+Q 1248 339 1248 96 
+Q 1248 -198 1053 -473 
+Q 858 -749 531 -902 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-46" d="M 2547 998 
+L 2637 941 
+Q 2362 403 2112 205 
+Q 1786 -64 1376 -64 
+Q 845 -64 502 336 
+Q 160 736 160 1357 
+Q 160 2170 698 2618 
+Q 1094 2944 1562 2944 
+Q 1965 2944 2256 2749 
+Q 2547 2554 2547 2285 
+Q 2547 2176 2457 2096 
+Q 2368 2016 2246 2016 
+Q 2022 2016 1939 2310 
+L 1901 2451 
+Q 1850 2630 1773 2694 
+Q 1696 2758 1523 2758 
+Q 1133 2758 893 2451 
+Q 653 2144 653 1645 
+Q 653 1094 928 745 
+Q 1203 397 1645 397 
+Q 1920 397 2118 528 
+Q 2317 659 2547 998 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-59" d="M 3053 2880 
+L 3053 2784 
+Q 2906 2771 2835 2688 
+Q 2765 2605 2637 2285 
+L 1818 230 
+Q 1690 -90 1638 -90 
+Q 1587 -90 1523 77 
+Q 1510 96 1497 141 
+Q 1485 186 1472 211 
+L 704 2048 
+Q 499 2534 403 2652 
+Q 307 2771 122 2784 
+L 122 2880 
+L 1376 2880 
+L 1376 2784 
+Q 1210 2771 1146 2732 
+Q 1082 2694 1082 2611 
+Q 1082 2509 1139 2368 
+L 1792 730 
+L 2426 2387 
+Q 2464 2483 2464 2579 
+Q 2464 2758 2163 2784 
+L 2163 2880 
+L 3053 2880 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-53" transform="translate(0 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-58" transform="translate(49.999954 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-56" transform="translate(99.999908 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-4b" transform="translate(138.899872 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-48" transform="translate(188.899826 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-47" transform="translate(233.299789 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-3" transform="translate(283.299744 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-44" transform="translate(308.299713 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-57" transform="translate(352.699677 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-3" transform="translate(380.499649 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Italic-57" transform="translate(405.499619 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-20" transform="translate(453.299591 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-13" transform="translate(541.79953 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-11" transform="translate(591.799484 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-16" transform="translate(616.799454 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-18" transform="translate(666.799408 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-f" transform="translate(716.799362 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-3" transform="translate(741.799332 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-55" transform="translate(766.799301 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-48" transform="translate(800.099274 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-46" transform="translate(844.499237 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-52" transform="translate(888.8992 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-59" transform="translate(938.899155 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-48" transform="translate(988.899109 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-55" transform="translate(1033.299072 0.203125)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-56" transform="translate(1066.599045 0.203125)"/>
+     </g>
+    </g>
+    <g id="dynamicmovem-line2d_28">
+     <path d="M 46.73 41.58 
+L 55.73 41.58 
+L 64.73 41.58 
+" style="fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: square"/>
+    </g>
+    <g id="dynamicmovem-text_18">
+     <!-- same weights, new goals -->
+     <g style="fill: var(--fg)" transform="translate(71.93 44.73) scale(0.09 -0.09)">
+      <defs>
+       <path id="dynamicmovem-STIXGeneral-Regular-5a" d="M 4442 2880 
+L 4442 2784 
+Q 4346 2752 4301 2691 
+Q 4256 2630 4179 2438 
+L 3296 224 
+Q 3168 -90 3117 -90 
+Q 3085 -90 3062 -48 
+Q 3040 -6 2963 186 
+L 2381 1696 
+L 1664 160 
+Q 1549 -90 1504 -90 
+Q 1446 -90 1338 192 
+L 474 2381 
+Q 378 2630 314 2700 
+Q 250 2771 134 2784 
+L 134 2880 
+L 1286 2880 
+L 1286 2784 
+Q 1120 2765 1056 2720 
+Q 992 2675 992 2573 
+Q 992 2477 1030 2381 
+L 1664 710 
+L 2246 1984 
+L 2118 2342 
+Q 2029 2598 1942 2681 
+Q 1856 2765 1677 2784 
+L 1677 2880 
+L 2976 2880 
+L 2976 2784 
+Q 2752 2752 2678 2707 
+Q 2605 2662 2605 2560 
+Q 2605 2458 2714 2176 
+L 3251 742 
+L 3827 2163 
+Q 3936 2432 3936 2592 
+Q 3936 2669 3875 2710 
+Q 3814 2752 3654 2784 
+L 3654 2880 
+L 4442 2880 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-4a" d="M 3008 2483 
+L 2477 2483 
+Q 2598 2208 2598 1946 
+Q 2598 1453 2265 1203 
+Q 1933 954 1600 954 
+Q 1530 954 1357 973 
+L 1235 986 
+Q 1107 947 979 812 
+Q 851 678 851 582 
+Q 851 435 1350 410 
+L 2176 371 
+Q 2528 358 2739 172 
+Q 2950 -13 2950 -314 
+Q 2950 -685 2566 -986 
+Q 2035 -1395 1286 -1395 
+Q 826 -1395 502 -1212 
+Q 179 -1030 179 -774 
+Q 179 -595 320 -419 
+Q 461 -243 806 6 
+Q 602 102 534 172 
+Q 467 243 467 346 
+Q 467 531 762 787 
+Q 909 915 1037 1043 
+Q 717 1203 579 1401 
+Q 442 1600 442 1901 
+Q 442 2336 752 2640 
+Q 1062 2944 1510 2944 
+Q 1766 2944 2022 2848 
+L 2163 2797 
+Q 2349 2733 2515 2733 
+L 3008 2733 
+L 3008 2483 
+z
+M 973 2163 
+L 973 2144 
+Q 973 1683 1155 1398 
+Q 1338 1114 1632 1114 
+Q 1850 1114 1978 1270 
+Q 2106 1427 2106 1690 
+Q 2106 2112 1914 2464 
+Q 1754 2765 1446 2765 
+Q 1222 2765 1097 2605 
+Q 973 2445 973 2163 
+z
+M 2771 -410 
+Q 2771 -230 2595 -163 
+Q 2419 -96 1978 -96 
+Q 1344 -96 941 -13 
+Q 749 -243 688 -348 
+Q 627 -454 627 -563 
+Q 627 -774 880 -902 
+Q 1133 -1030 1555 -1030 
+Q 2099 -1030 2435 -860 
+Q 2771 -691 2771 -410 
+z
+" transform="scale(0.015625)"/>
+       <path id="dynamicmovem-STIXGeneral-Regular-4f" d="M 1645 0 
+L 134 0 
+L 134 96 
+Q 435 122 531 221 
+Q 627 320 627 589 
+L 627 3590 
+Q 627 3821 569 3910 
+Q 512 4000 358 4000 
+Q 224 4000 122 3987 
+L 122 4090 
+Q 730 4237 1133 4371 
+L 1165 4346 
+L 1165 557 
+Q 1165 288 1254 201 
+Q 1344 115 1645 96 
+L 1645 0 
+z
+" transform="scale(0.015625)"/>
+      </defs>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-56"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-44" transform="translate(38.90625 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-50" transform="translate(83.3125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-48" transform="translate(161.109375 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-3" transform="translate(205.515625 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-5a" transform="translate(230.515625 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-48" transform="translate(300.921875 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-4c" transform="translate(345.328125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-4a" transform="translate(373.125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-4b" transform="translate(423.125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-57" transform="translate(473.125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-56" transform="translate(500.921875 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-f" transform="translate(539.828125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-3" transform="translate(564.828125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-51" transform="translate(589.828125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-48" transform="translate(639.828125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-5a" transform="translate(682.328125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-3" transform="translate(754.53125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-4a" transform="translate(779.53125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-52" transform="translate(829.53125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-44" transform="translate(879.53125 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-4f" transform="translate(923.9375 0)"/>
+      <use xlink:href="#dynamicmovem-STIXGeneral-Regular-56" transform="translate(951.734375 0)"/>
+     </g>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="dynamicmovem-p6cfdbfdddd">
+   <rect x="38.63" y="2.88" width="217.641434" height="199.584"/>
+  </clipPath>
+ </defs>
+</svg>
+
+      <figcaption><b>Figure 2.</b> A DMP fit to one demonstration (black), rolled out with the same weights to new goals (teal) and with a push mid-movement (orange, dashed), from which it recovers. My implementation of the equations above.</figcaption>
+    </figure>
+
+    <h2>6. What robot learning should take from this</h2>
+    <ul>
+      <li><b>Action spaces with structure.</b> Synergies and primitives are hand-designed latent action spaces. A
+      policy that outputs a few synergy amplitudes, or primitive parameters, explores a much smaller space, at the cost
+      of reach; learned latent action spaces are the data-driven version.</li>
+      <li><b>Backbone plus compliance.</b> The SoftHand lesson is that a low-dimensional command works because
+      compliance absorbs the mismatch with the object. Low-dimensional control and compliant contact go together.</li>
+      <li><b>Keep the high-order detail.</b> Santello's small components carried object information. Truncating to two
+      synergies is fine for power grasps and not for in-hand manipulation.</li>
+    </ul>
+
+    <h2>References</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Reference</th><th>Venue</th></tr>
+      <tr><td>Bizzi, Mussa-Ivaldi, Giszter, <a href="https://doi.org/10.1126/science.1857964">Computations underlying the execution of movement: a biological perspective</a></td><td>Science 253, 1991</td></tr>
+      <tr><td>Santello, Flanders, Soechting, <a href="https://doi.org/10.1523/JNEUROSCI.18-23-10105.1998">Postural hand synergies for tool use</a></td><td>J. Neurosci. 18, 1998</td></tr>
+      <tr><td>d'Avella, Saltiel, Bizzi, <a href="https://doi.org/10.1038/nn1010">Combinations of muscle synergies in the construction of a natural motor behavior</a></td><td>Nat. Neurosci. 6, 2003</td></tr>
+      <tr><td>Ciocarlie, Allen, <a href="https://doi.org/10.1177/0278364909105606">Hand posture subspaces for dexterous robotic grasping</a></td><td>IJRR 28, 2009</td></tr>
+      <tr><td>Ijspeert et al., <a href="https://doi.org/10.1162/NECO_a_00393">Dynamical movement primitives: learning attractor models for motor behaviors</a></td><td>Neural Comput. 25, 2013</td></tr>
+      <tr><td>Catalano et al., <a href="https://doi.org/10.1177/0278364913518998">Adaptive synergies for the design and control of the Pisa/IIT SoftHand</a></td><td>IJRR 33, 2014</td></tr>
+    </table></div>
+  </article>
+</body>
+</html>
