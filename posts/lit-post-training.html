@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Post-Training Robot Policies: Challenges, Problems and Open Questions · Anirudha Karande</title>
+  <meta name="description" content="Why post-training a robot foundation model is harder than post-training a language model: expensive rollouts, no verifier, flow policies without likelihoods, forgetting, and evaluation, with the open questions each leaves.">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+  <link rel="stylesheet" href="../style.css?v=25">
+  <script src="../theme.js?v=5"></script>
+  <script data-goatcounter="https://anirudha.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '\\(', right: '\\)', display: false}]})"></script>
+</head>
+<body>
+  <article class="post">
+    <div class="post-top"><a class="back" href="../writing.html">&larr; Writing</a><button class="theme-toggle" type="button" aria-label="Switch between light and dark"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button></div>
+    <h1>Post-Training Robot Policies: Challenges, Problems and Open Questions</h1>
+    <p class="meta">[Literature Review]</p>
+    <div class="tldr"><p>Robot foundation models copied the language-model recipe: start from a vision-language model,
+    pretrain on broad robot data, then post-train for a task. Post-training is where most of a robot's task skill is
+    actually learned, and it is harder than for language models because three things that are cheap there are
+    expensive here: rollouts, rewards and action likelihoods. This review goes through the evidence for each, then for
+    two quieter problems, forgetting and evaluation, and ends with the questions that are still open. The thread through
+    all of them: post-training of language models scaled once it had cheap rollouts and an automatic verifier, and
+    robotics has neither yet.</p></div>
+
+    <h2>1. The recipe, and what post-training means here</h2>
+    <p>Current vision-language-action (VLA) policies, such as π0, OpenVLA, GR00T N1 and Gemini Robotics, are built in
+    three stages. A vision-language model trained on web data supplies the backbone. The model is pretrained on large,
+    mixed robot datasets. Then it is post-trained for a particular task, robot or level of quality. In this review
+    the <b>policy</b> is the network that commands the robot. Other learned models are named when they appear: a
+    <b>critic</b> or value function, a <b>reward model</b>, a <b>world model</b>. Post-training changes the policy, or in
+    a few methods adds a small policy next to a frozen one.</p>
+    <p>The π0 paper (Black et al.) states the division of labour clearly. The pretraining data should cover as many tasks
+    and behaviours as possible, including mistakes and recoveries. The post-training data should show fluent, efficient
+    execution of the target task. Training only on clean data never shows the policy how to recover, because clean
+    data contains few mistakes; training only on messy data never shows it how to act efficiently. GR00T N1 draws the
+    same idea as a pyramid (Figure 1): the higher the layer, the less data and the more specific it is to one robot.</p>
+    <figure class="fig paper">
+      <img src="img/bjorck2025-fig1.jpg" alt="GR00T N1 data pyramid: web data and human videos at the base, synthetic data in the middle, real-world robot data at the top" loading="lazy">
+      <figcaption><b>Figure 1.</b> The data pyramid behind a robot foundation model. Moving up, data quantity falls and embodiment-specificity rises; post-training draws on the top. Reproduced from NVIDIA (Bjorck et al.), GR00T N1, <a href="https://arxiv.org/abs/2503.14734">arXiv:2503.14734</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>The scale matters for what follows. π0 was pretrained on about 10,000 hours of its own robot data plus the Open
+    X-Embodiment collection (22 robots from 21 institutions). DROID adds 350 hours over 564 scenes, and OpenVLA trained on
+    970,000 demonstrations. That is large for robotics and small next to the trillions of tokens behind a language
+    model. A consequence: robot post-training does more of the learning than its language-model namesake. Post-training
+    a language model mostly brings out what pretraining already put there. A robot learning to fold a particular shirt
+    on a particular arm is mostly learning the skill during post-training, from a good starting point.</p>
+    <p>The methods in use fall into a handful of families:</p>
+    <div class="table-wrap"><table>
+      <tr><th>Family</th><th>What changes</th><th>Examples</th></tr>
+      <tr><td>Fine-tuning on curated demos (SFT)</td><td>Policy weights</td><td>π0 task fine-tuning; OpenVLA-OFT; Gemini Robotics (new short tasks from as few as 100 demos)</td></tr>
+      <tr><td>Interactive imitation</td><td>Policy weights, from human corrections</td><td>DAgger, HG-DAgger, the interventions in Recap</td></tr>
+      <tr><td>Real-world RL</td><td>Policy weights, from the robot's own experience</td><td>SERL, HIL-SERL, PA-RL, ConRFT, π*0.6 with Recap</td></tr>
+      <tr><td>RL in simulation or a world model</td><td>Policy weights</td><td>DPPO, SimpleVLA-RL, RL4VLA, RIPT-VLA, VLA-RL, πRL, WMPO, VLA-RFT</td></tr>
+      <tr><td>A small policy beside a frozen one</td><td>A new small network only</td><td>ResiP (residual corrections), DSRL (RL in the noise space)</td></tr>
+      <tr><td>Steering at deployment</td><td>No weights; a critic or verifier picks actions</td><td>V-GPS, RoboMonkey</td></tr>
+      <tr><td>Distilling RL specialists</td><td>Policy weights, on RL-generated data</td><td>RLDG</td></tr>
+    </table></div>
+
+    <h2>2. The imitation ceiling</h2>
+    <p>Behaviour cloning can at best match its demonstrations, and teleoperated demonstrations are hesitant, slow and
+    inconsistent between operators. RLDG (Xu et al.) tested what better data is worth. They trained a reinforcement
+    learning specialist for each task, then fine-tuned OpenVLA and Octo on the specialists' rollouts instead of on human
+    demonstrations. Success rose by up to 40% on precise connector insertion and assembly, and the policies generalised
+    better to new tasks. The authors attribute the gain to two things: better coverage of states, and better actions.
+    Figure 2 shows the second. At the same pose just before insertion, human actions scatter around zero, while RL
+    actions sit in the corner of action space that points at the hole.</p>
+    <figure class="fig paper">
+      <img src="img/xu2024-fig8.png" alt="Scatter of the first two action dimensions for human demonstrations, centred on zero, and RL data, concentrated in the bottom-left corner" loading="lazy">
+      <figcaption><b>Figure 2.</b> Actions at one pre-insertion pose (end-effector within 4 mm in x and y). The arm must move in −x and −y. Human actions cluster near zero; RL actions concentrate near the correct corner. Reproduced from Xu, Li, Luo and Levine, RLDG, <a href="https://arxiv.org/abs/2412.09858">arXiv:2412.09858</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>Precision is where the ceiling shows first. Ankile et al. (ResiP) found that on assembly tasks behaviour cloning
+    saturates as demonstrations are added, for two reasons. The first is distribution shift from training on offline
+    data. The second is action chunking: the policy predicts a chunk of future actions and executes it open-loop, so it
+    behaves like a trajectory planner rather than a feedback controller. The failures are small misalignments
+    (Figure 3), exactly what a small correction would fix. ResiP keeps the chunked policy frozen and trains a closed-loop
+    residual policy on top with RL.</p>
+    <figure class="fig paper">
+      <img src="img/ankile2024-fig6.jpg" alt="Four simulated assembly failures: bad part alignment, an unseen in-hand pose after pushing a misaligned object, and a bad grasp for insertion" loading="lazy">
+      <figcaption><b>Figure 3.</b> Typical failures of a diffusion policy trained by behaviour cloning on precise assembly: bad part alignment, an unseen in-hand pose, a bad grasp. Each could be fixed by a small correction. Reproduced from Ankile, Simeonov, Shenfeld, Torne and Agrawal, ResiP, <a href="https://arxiv.org/abs/2407.16677">arXiv:2407.16677</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>The older problem, compounding error, has an older fix. DAgger (Ross et al.) collects expert labels on the states
+    the learner itself visits, so the training distribution follows the policy. HG-DAgger (Kelly et al.) lets the human
+    take control when the robot drifts, and this is how most robot systems now gather corrections; Recap uses a form of
+    it. Corrections carry a lot of information per sample, but they cost human attention for every robot-hour.</p>
+
+    <h2>3. Experience is expensive</h2>
+    <p>A real rollout takes minutes, needs a reset, wears the hardware, and one robot can run only one at a time. The
+    real-world RL systems that work are best read as engineering around that cost. SERL (Luo et al.) learned PCB
+    assembly, cable routing and object relocation in 25–50 minutes of training per policy. It combined sample-efficient
+    off-policy RL, demonstrations, and tooling for computing rewards and resetting the scene. HIL-SERL (Figure 4) adds human interventions.
+    A binary reward classifier is trained from teleoperated successes and failures, 20–30 demonstrations seed the
+    buffer, and online RL runs with corrections that taper off as the policy improves. On tasks including dashboard
+    installation and timing-belt assembly it reached near-perfect success within 1–2.5 hours of training. Against
+    imitation baselines it averaged twice the success rate and 1.8 times faster execution.</p>
+    <figure class="fig paper">
+      <img src="img/luo2024-fig3.png" alt="HIL-SERL pipeline: train a binary reward classifier, collect demonstrations, then train RL online with human interventions" loading="lazy">
+      <figcaption><b>Figure 4.</b> Real-world RL as a system: (1) a binary reward classifier from teleoperated success and failure samples, (2) 20–30 demonstrations, (3) online RL with interventions that become rarer as success rises and cycle time falls. Reproduced from Luo, Xu, Wu and Levine, HIL-SERL, <a href="https://arxiv.org/abs/2410.21845">arXiv:2410.21845</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>The same pattern holds for large VLAs:</p>
+    <ul>
+      <li>PA-RL fine-tuned OpenVLA autonomously with Cal-QL from 40% to 70% success in 40 minutes of real-world
+      interaction.</li>
+      <li>ConRFT reached 96.3% average success over eight tasks with 45–90 minutes of online fine-tuning, with
+      interventions.</li>
+      <li>π*0.6 with Recap more than doubled throughput and roughly halved the failure rate on the hardest tasks. It made
+      espresso drinks for 13 hours straight and folded laundry in a new home for over two hours without
+      interruption.</li>
+    </ul>
+    <p>All of these systems share two features. Each is off-policy or offline-to-online and reuses demonstrations;
+    on-policy PPO, the default for language models, wastes too many rollouts on a real robot. And each keeps a human in
+    the loop for resets, labels or corrections. The price is hours of robot time and human attention per task, and it
+    grows linearly with the number of tasks.</p>
+    <p>Simulation removes that price where the physics can be simulated. Locomotion policies train in minutes on one GPU
+    (Rudin et al.) and transfer zero-shot to mud, snow and rubble (Lee et al.). Manipulation is harder to simulate:
+    contact, deformable objects and photorealistic scenes are where simulators fall short. <a href="lit-adaptation.html">Learning
+    to Adapt</a> covers sim-to-real transfer in more detail.</p>
+
+    <h2>4. There is no verifier</h2>
+    <p>Reinforcement learning for language models took off with verifiable rewards: answers that can be checked, code
+    that passes its tests (DeepSeek-R1). Robots have no unit test for "folded neatly". The options in use each trade
+    generality against cost:</p>
+    <ul>
+      <li><b>A classifier on the final image.</b> HIL-SERL uses one. It is accurate but needs labelled successes and
+      failures for every task.</li>
+      <li><b>Episode-level human labels.</b> Recap asks only whether each episode succeeded and turns that label into a
+      reward, so the value function predicts the negative number of steps left until success:
+      $$r_t = \begin{cases} 0 & t = T \text{ and success} \\ -C_{\text{fail}} & t = T \text{ and failure} \\ -1 & \text{otherwise.} \end{cases}$$
+      This applies to any task, but a person has to judge every episode. Credit then has to be assigned over the whole
+      episode, which at 10–50 Hz with action chunks means thousands of actions.</li>
+      <li><b>Vision-language judges and progress estimators.</b> SuccessVQA (Du et al.) treats success as visual
+      question answering. GVL predicts progress zero-shot on more than 300 real tasks by having a VLM put shuffled
+      frames back in order. VLAC is a process reward model that lifted four real tasks from about 30% to about 90%
+      success within 200 episodes. ReWiND learns a language-conditioned reward from a small demonstration set plus
+      Open X-Embodiment data.</li>
+    </ul>
+    <p>The weak spot is out-of-distribution behaviour, and that is exactly where RL explores. Figure 5 shows ReWiND
+    scoring a successful bimanual demonstration as if almost nothing happened. The authors attribute this to little
+    bimanual data in Open X-Embodiment, occlusion and a poor camera angle. A reward model that is wrong where the policy
+    explores will be exploited. On a robot that means physical reward hacking: an object placed so that the camera sees
+    success.</p>
+    <figure class="fig paper">
+      <img src="img/zhang2025b-fig8.jpg" alt="A successful bimanual sponge handover and scrubbing demonstration whose learned reward stays between 0.05 and 0.35 and decays over time" loading="lazy">
+      <figcaption><b>Figure 5.</b> A learned reward model failing out of distribution. On a successful demonstration (pick up a sponge, hand it over, scrub the plate) the reward stays low and decays. Reproduced from Zhang et al., ReWiND, <a href="https://arxiv.org/abs/2505.10911">arXiv:2505.10911</a>, CC BY 4.0.</figcaption>
+    </figure>
+
+    <h2>5. The action head fights the gradient</h2>
+    <p>Policy-gradient methods need \(\log\pi(a\mid s)\). Modern VLAs output continuous action chunks from diffusion or
+    flow-matching heads (Diffusion Policy, π0, GR00T N1), and those give no closed-form likelihood for a chunk. There
+    are three ways around this.</p>
+    <p><b>Turn the sampler into an MDP.</b> DPPO (Ren et al.) treats each denoising step as an action in an inner MDP
+    nested inside the environment MDP (Figure 6). Each step is Gaussian, so its likelihood is tractable and PPO applies.
+    The authors report structured exploration that stays on the data manifold, stable fine-tuning, and sim-to-real
+    transfer on an assembly task.</p>
+    <figure class="fig paper">
+      <img src="img/ren2024-fig1.jpg" alt="DPPO overview: diffusion MDPs nested inside the environment MDP, with a policy-gradient update on per-step denoising likelihoods" loading="lazy">
+      <figcaption><b>Figure 6.</b> DPPO: the denoising chain becomes a "Diffusion MDP" inside the environment MDP, so the task reward reaches every denoising step and the gradient uses the Gaussian likelihood of each step. Reproduced from Ren et al., DPPO, <a href="https://arxiv.org/abs/2409.00588">arXiv:2409.00588</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>Flow-matching policies integrate a deterministic ODE, so noise has to be injected before any step has a
+    likelihood. ReinFlow learns that noise. πRL (Chen et al.) does it for π0 and π0.5 in two ways (Figure 7). Flow-Noise
+    adds a learnable noise network and computes the exact likelihood of the denoising chain,</p>
+    $$\log \pi(\mathbf{A}\mid \mathbf{o}) = \log \pi(\mathbf{A}^{0}\mid \mathbf{o}) + \sum_{k=0}^{K-1} \log \pi\big(\mathbf{A}^{\tau_{k+1}} \mid \mathbf{A}^{\tau_k}, \mathbf{o}\big),$$
+    <p>while Flow-SDE converts the ODE into an SDE and treats denoising and acting as a two-layer MDP.</p>
+    <figure class="fig paper">
+      <img src="img/chen2025-fig3.png" alt="Flow-Noise as a one-layer MDP with the denoising chain inside each step, and Flow-SDE as a two-layer MDP with inner denoising and outer environment steps" loading="lazy">
+      <figcaption><b>Figure 7.</b> Two ways to give a flow-matching VLA a likelihood. Flow-Noise: one environment-level MDP whose action likelihood is the product over denoising steps. Flow-SDE: an inner denoising MDP inside the outer environment MDP. Reproduced from Chen et al., πRL, <a href="https://arxiv.org/abs/2510.25889">arXiv:2510.25889</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p><b>Avoid the likelihood.</b> Several methods never compute it:</p>
+    <ul>
+      <li>DSRL (Wagenmaker et al.) runs RL over the latent noise fed into a frozen diffusion policy. It needs only
+      black-box access to the policy.</li>
+      <li>ResiP adds a small Gaussian residual policy on top of the frozen one.</li>
+      <li>PA-RL samples candidate actions, re-ranks and refines them with a critic, then trains the policy on the best
+      ones with an ordinary supervised loss. That works for diffusion and autoregressive policies alike.</li>
+      <li>Recap conditions the policy on a binary indicator of whether the value function judged an action an
+      improvement, trains with the usual imitation loss, and asks for the "improvement" behaviour at deployment. The paper notes that a PPO-style trust region was hard
+      to enforce on the unbounded flow head, partly because new real-robot data cannot be collected every few gradient
+      steps.</li>
+    </ul>
+    <p><b>Leave the weights alone.</b> RoboMonkey (Kwok et al.) samples several actions and lets a verifier choose
+    (Figure 8). With a perfect verifier, action error falls as a power law in the number of samples across four VLAs.
+    With a learned VLM verifier, success rose 25 points on out-of-distribution tasks and 9 points in distribution. V-GPS
+    (Nakamoto et al.) instead re-ranks actions with a value function learned by offline RL, and improved five different
+    generalist policies without touching their weights.</p>
+    <figure class="fig paper">
+      <img src="img/kwok2025-fig1.png" alt="Oracle action error versus number of samples on a log axis, falling as a power law for several sampling schemes and several VLAs" loading="lazy">
+      <figcaption><b>Figure 8.</b> An inference-time scaling law for VLAs: with an oracle verifier, action error falls roughly as a power law in the number of samples, for several sampling schemes (left) and several base policies (right). Reproduced from Kwok et al., RoboMonkey, <a href="https://arxiv.org/abs/2506.17811">arXiv:2506.17811</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>The catch is time. Every sample costs inference time, and a control loop has a deadline. When inference is slow,
+    an action-chunking policy pauses or jerks at chunk boundaries. Real-time chunking (Black, Galliker and Levine)
+    generates the next chunk while the current one runs: it freezes the actions that will execute anyway and inpaints
+    the rest, and it stays robust with inference delays above 300 ms. Model size, sampling and
+    verification all spend the same latency budget.</p>
+
+    <h2>6. Fine-tuning forgets</h2>
+    <p>VLAs inherit semantic knowledge from their vision-language backbone, and that knowledge is what lets them follow
+    instructions they were never trained on. Post-training on robot data wears it away. In Figure 9 the original VLM
+    answers a safety question, and the VLA fine-tuned from it answers with an action vector. Hancock et al. trace this to
+    the mismatch between web pretraining data and robot data. Their fix, VLM2VLA, writes actions in natural language
+    and trains only low-rank (LoRA) adapters. Driess et al. found something similar from the architecture side. Bolting
+    a randomly initialised flow-matching action expert onto the backbone and backpropagating through both slows
+    training and degrades language following. Their remedy, knowledge insulation, co-trains on VLM data, trains the
+    backbone on discrete FAST action tokens, and stops the action expert's gradient from reaching the backbone.</p>
+    <figure class="fig paper">
+      <img src="img/hancock2025-fig2.jpg" alt="Three panels: the base VLM and VLM2VLA answer that clearing the counter would risk collision with a human, while a standard VLA answers with a vector of numbers" loading="lazy">
+      <figcaption><b>Figure 9.</b> What forgetting looks like in a VLA. Asked whether clearing the counter is safe with a person nearby, the base VLM and the VLM2VLA policy reason about collision; a conventionally trained VLA outputs an action vector. Reproduced from Hancock, Wu, Zha, Russakovsky and Majumdar, <a href="https://arxiv.org/abs/2509.22195">arXiv:2509.22195</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>RL's Razor (Shenfeld, Pari and Agrawal) gives a general account (Figure 10). It covers language-model tasks and
+    one robot task: OpenVLA-7B learning to pick up a can in SimplerEnv, with forgetting measured on drawer opening and
+    closing. Across fine-tuning methods and hyperparameters, forgetting is predicted by the KL divergence from the base
+    policy, measured only on the new task,</p>
+    $$\mathbb{E}_{x\sim\tau}\Big[\mathrm{KL}\big(\pi_0(\cdot\mid x)\,\big\|\,\pi(\cdot\mid x)\big)\Big].$$
+    <p>With a binary reward, policy gradient converges to the optimal policy closest to the starting one,
+    \(\pi^{\dagger} = \arg\min_{\pi \in P^{*}\cap\Pi} \mathrm{KL}(\pi\,\|\,\pi_0)\). SFT has no such bias and can end up
+    arbitrarily far away. The deciding factor is the distribution the model is trained toward, not the algorithm: in a
+    controlled toy setting, SFT on targets deliberately chosen to be KL-minimal forgot even less than RL did.</p>
+    <figure class="fig paper">
+      <img src="img/shenfeld2025-fig1.jpg" alt="Left: RL and SFT paths from a base policy to the set of policies with 90% new-task success, with RL ending closer in KL. Right: prior-task performance against new-task performance, with SFT falling off faster" loading="lazy">
+      <figcaption><b>Figure 10.</b> RL's Razor, schematically. Left: among policies that solve the new task, on-policy RL lands on one close in KL to the base policy, while SFT can land far away. Right: at matched new-task performance, RL keeps more of the prior tasks. Reproduced from Shenfeld, Pari and Agrawal, <a href="https://arxiv.org/abs/2509.04259">arXiv:2509.04259</a> (ICLR 2026), CC BY 4.0.</figcaption>
+    </figure>
+    <p>For robots the implication is uncomfortable. Human teleoperation sits far from the policy's own action
+    distribution, so SFT on human demonstrations, the default way to post-train a VLA, forgets by construction. Shenfeld
+    et al.'s follow-up, self-distillation fine-tuning (SDFT), learns from demonstrations on-policy: the model,
+    conditioned on the demonstration, serves as its own teacher. That depends on in-context learning, which language
+    models have and current VLAs largely do not.</p>
+
+    <h2>7. Does RL teach new behaviour or sharpen old behaviour?</h2>
+    <p>For language models, Yue et al. measured pass@k at large k and found that RL-trained models win at k = 1 while their
+    base models win when many samples are allowed. In their analysis, what RL achieved was bounded by the base model;
+    distillation from a stronger teacher, by contrast, did add new reasoning patterns.</p>
+    <p>The robot evidence is mixed in an interesting way. RL4VLA (Liu et al.) compared PPO with SFT for OpenVLA across
+    vision, semantic and execution shifts (Figure 11). RL generalised much better on execution (unseen positions, initial
+    poses, objects moved mid-episode), moderately better on semantics, and the same on vision.</p>
+    <figure class="fig paper wide">
+      <img src="img/liu2025-fig1.jpg" alt="Benchmark of out-of-distribution shifts in vision, semantics and execution, with bars showing RL ahead of SFT on execution, slightly ahead on semantics and equal on vision" loading="lazy">
+      <figcaption><b>Figure 11.</b> Where RL fine-tuning generalises better than SFT: clearly on execution, moderately on semantics, not on vision. Reproduced from Liu et al., <a href="https://arxiv.org/abs/2505.19789">arXiv:2505.19789</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>SimpleVLA-RL (Li et al.) reports "pushcut" (Figure 12): after RL, the policy pushes the can to the pot, where every
+    demonstration grasped, moved and placed it. WMPO reports self-correction emerging in the same way.</p>
+    <figure class="fig paper">
+      <img src="img/li2025-fig6a.png" alt="Top row: the SFT policy grasps the can as in the demonstrations. Bottom row: the RL policy pushes the can to the pot" loading="lazy">
+      <figcaption><b>Figure 12.</b> "Pushcut": on the RoboTwin 2.0 task "move can pot", the SFT policy grasps as in the demonstrations (top); after RL the policy pushes instead (bottom). Reproduced from Li et al., SimpleVLA-RL, <a href="https://arxiv.org/abs/2509.09674">arXiv:2509.09674</a>, CC BY-NC-SA 4.0 (unmodified).</figcaption>
+    </figure>
+    <p>Success rates cannot tell us whether pushcut is new in Yue et al.'s sense. The base policy may already push now and
+    then if sampled enough, and RL may simply have made that more likely. Settling it needs coverage measurements:
+    sample the base policy many times and count how often it pushes. Robot papers rarely report them. In practice,
+    sharpening may be the product anyway. The gap from 60% to 95% success, and cycle times faster than a teleoperator
+    (HIL-SERL, Recap), are both sharpening.</p>
+
+    <h2>8. Where rollouts come from: simulators and world models</h2>
+    <p>RL in simulation works on VLA benchmarks, but the headroom has gone. On LIBERO, OpenVLA-OFT reaches 97.1% with SFT
+    alone. RIPT-VLA takes it to 97.5%, and lifts a one-demonstration model from 4% to 97% in 15 iterations. Gains that
+    close to the ceiling say little about the real world. SIMPLER (Li et al.) shows the more durable use of a simulator:
+    with system identification and visual matching, its scores correlate strongly with real-world success, which makes
+    it an evaluator rather than a training ground.</p>
+    <p>A learned world model is trained on real video and lets the policy act in imagination. As evaluators, WorldEval
+    and Ctrl-World rank policies consistently with real-world results. Ctrl-World also generates successful imagined
+    trajectories for fine-tuning, which raised success by 44.7%. As training grounds, VLA-RFT uses verified rewards
+    inside a world model and beats supervised baselines in under 400 fine-tuning steps. WMPO runs on-policy GRPO in a
+    pixel-space world model.</p>
+    <p>The failure mode is contact. Figure 13 is WMPO's own failure case: the imagined trajectory matches reality until
+    the last frame, then misses the square jamming on the peg. RL optimises against the model's errors. A policy rewarded
+    in imagination for an insertion that jams in reality learns the wrong thing, and contact events are short, rare in
+    video data, and decisive for success.</p>
+    <figure class="fig paper">
+      <img src="img/zhu2025-fig9.png" alt="Real and imagined frames of a square-onto-peg insertion that agree until the last frame, where the real square jams" loading="lazy">
+      <figcaption><b>Figure 13.</b> A world model that is right until contact: the imagined rollout tracks the real one but misses the square getting stuck on the peg at the end. Reproduced from Zhu et al., WMPO, <a href="https://arxiv.org/abs/2511.09515">arXiv:2511.09515</a>, CC BY 4.0.</figcaption>
+    </figure>
+
+    <h2>9. Evaluation decides what we believe</h2>
+    <p>Real-world results usually rest on tens of trials. Kress-Gazit et al. give an example from their own evaluations
+    (Figure 14). Policy A succeeded 15 times in 18 (83%) and policy B 11 times in 17 (65%). Treat each success
+    probability as unknown with a uniform prior, so that \(p \sim \mathrm{Beta}(s+1, f+1)\) for \(s\) successes and
+    \(f\) failures. Then the probability that B is actually the better policy is 11%. Holding both rates fixed, that
+    probability falls to 4% at 30 trials each, 1% at 50 and 0.2% at 100 (my computation, by sampling). Many
+    post-training comparisons report gaps smaller than 18 points on fewer trials.</p>
+    <figure class="fig paper">
+      <img src="img/kressgazit2024-fig6.png" style="max-width: 440px" alt="Two overlapping posterior densities of success probability, and a histogram of their difference that includes zero" loading="lazy">
+      <figcaption><b>Figure 14.</b> 15/18 against 11/17. Top: posterior success probabilities of policy A (red) and B (blue). Bottom: their difference, whose spread includes zero. Reproduced from Kress-Gazit et al., <a href="https://arxiv.org/abs/2409.09491">arXiv:2409.09491</a>, CC BY 4.0.</figcaption>
+    </figure>
+    <p>Infrastructure is improving. AutoEval runs real evaluations around the clock with automatic success detection
+    and resets. SIMPLER and world-model evaluators cut the cost of ranking policies. The STAR-Gen taxonomy separates
+    visual, semantic and behavioural generalisation, and using it found that open VLAs struggle with semantic
+    generalisation despite their internet pretraining. Two gaps are specific to post-training and still rarely
+    reported. One is what the policy lost: few papers re-measure the base model's abilities after fine-tuning, as RL's
+    Razor does. The other is the human cost: intervention hours and resets, which are the true price of real-world
+    RL.</p>
+
+    <h2>10. Open questions</h2>
+    <ol>
+      <li><b>How good must the base policy be?</b> If on-policy RL can only reach solutions close in KL to the base
+      policy, the base policy must already give success some probability. When it does not, the only option is SFT,
+      with the forgetting that comes with it. Measuring the base policy's coverage of a task before choosing a
+      post-training method is not yet standard practice.</li>
+      <li><b>Can a policy keep learning without regressing?</b> RL's Razor and SDFT point toward on-policy learning.
+      Nobody has yet shown a VLA adding skills one after another for months while keeping the old ones.</li>
+      <li><b>Is there a general robot reward model?</b> Progress estimators work in distribution and fail on new
+      embodiments and viewpoints (Figure 5). Something that does for robots what verifiers did for language models
+      would change how far RL can scale.</li>
+      <li><b>Which RL algorithm suits expressive policies?</b> Likelihoods through the denoising chain (DPPO, πRL), RL
+      in noise space (DSRL), residuals (ResiP), critic re-ranking (PA-RL) and advantage conditioning (Recap) all work
+      somewhere. Head-to-head comparisons on the same real tasks are missing.</li>
+      <li><b>Can RL run across many tasks at once?</b> Language-model RL trains on thousands of environments together.
+      Robot RL mostly trains one task at a time, a few at most. Whether hundreds of physical tasks interfere with each
+      other is untested.</li>
+      <li><b>Where should rollouts come from?</b> Real fleets, simulators or world models. World models are already
+      useful for ranking policies; for training they invite exploitation at contact (Figure 13).</li>
+      <li><b>Inference compute or latency?</b> Sampling and verification improve as a power law (Figure 8), while the
+      control loop has a hard deadline. The best way to split a fixed latency budget between model size, samples and
+      verification is unknown.</li>
+      <li><b>Which layer should be post-trained?</b> Hierarchical systems (Hi Robot) and embodied chain-of-thought
+      (ECoT) put a language-level decision above the motor policy. RL on that layer resembles language-model RL and
+      gets cleaner rewards; RL on the motor layer is the hard part.</li>
+      <li><b>What should post-training data be?</b> How much is needed, does it need to be on-policy, and should it
+      come from humans or from RL specialists? RLDG shows that RL-generated data can beat human demonstrations.</li>
+      <li><b>How can human attention per robot-hour be reduced?</b> Interventions, resets and labels make real-world
+      RL work, and their cost grows linearly with tasks and fleet size.</li>
+      <li><b>Can evaluation be cheap and trustworthy?</b> That includes reporting forgetting and human cost. Without it,
+      none of the other questions gets a clean answer.</li>
+    </ol>
+    <p>Most of these questions are the same problem seen from different sides. Post-training of language models took off
+    once rollouts were cheap and rewards could be checked automatically. Robot post-training will scale with whatever
+    substitutes for those two: better simulators or world models for the first, general reward models for the second.
+    Until then, the human in the loop fills both gaps, and pays for them in hours.</p>
+
+    <h2>References</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Reference</th><th>Venue</th></tr>
+      <tr><td>Black et al., <a href="https://arxiv.org/abs/2410.24164">π0: A Vision-Language-Action Flow Model for General Robot Control</a></td><td>arXiv 2024</td></tr>
+      <tr><td>Physical Intelligence et al., <a href="https://arxiv.org/abs/2504.16054">π0.5: a VLA Model with Open-World Generalization</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Physical Intelligence et al., <a href="https://arxiv.org/abs/2511.14759">π*0.6: a VLA That Learns From Experience (Recap)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Kim et al., <a href="https://arxiv.org/abs/2406.09246">OpenVLA: An Open-Source Vision-Language-Action Model</a></td><td>CoRL 2024</td></tr>
+      <tr><td>Kim, Finn, Liang, <a href="https://arxiv.org/abs/2502.19645">Fine-Tuning VLA Models: Optimizing Speed and Success (OpenVLA-OFT)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>NVIDIA (Bjorck et al.), <a href="https://arxiv.org/abs/2503.14734">GR00T N1: An Open Foundation Model for Generalist Humanoid Robots</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Gemini Robotics Team, <a href="https://arxiv.org/abs/2503.20020">Gemini Robotics: Bringing AI into the Physical World</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Open X-Embodiment Collaboration, <a href="https://arxiv.org/abs/2310.08864">Open X-Embodiment: Robotic Learning Datasets and RT-X Models</a></td><td>ICRA 2024</td></tr>
+      <tr><td>Khazatsky et al., <a href="https://arxiv.org/abs/2403.12945">DROID: A Large-Scale In-The-Wild Robot Manipulation Dataset</a></td><td>RSS 2024</td></tr>
+      <tr><td>Pertsch et al., <a href="https://arxiv.org/abs/2501.09747">FAST: Efficient Action Tokenization for VLA Models</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Chi et al., <a href="https://arxiv.org/abs/2303.04137">Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</a></td><td>RSS 2023</td></tr>
+      <tr><td>Ross, Gordon, Bagnell, <a href="https://arxiv.org/abs/1011.0686">A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning (DAgger)</a></td><td>AISTATS 2011</td></tr>
+      <tr><td>Kelly et al., <a href="https://arxiv.org/abs/1810.02890">HG-DAgger: Interactive Imitation Learning with Human Experts</a></td><td>ICRA 2019</td></tr>
+      <tr><td>Xu, Li, Luo, Levine, <a href="https://arxiv.org/abs/2412.09858">RLDG: Robotic Generalist Policy Distillation via RL</a></td><td>arXiv 2024</td></tr>
+      <tr><td>Ankile, Simeonov, Shenfeld, Torne, Agrawal, <a href="https://arxiv.org/abs/2407.16677">From Imitation to Refinement: Residual RL for Precise Assembly (ResiP)</a></td><td>arXiv 2024</td></tr>
+      <tr><td>Luo et al., <a href="https://arxiv.org/abs/2401.16013">SERL: A Software Suite for Sample-Efficient Robotic RL</a></td><td>ICRA 2024</td></tr>
+      <tr><td>Luo, Xu, Wu, Levine, <a href="https://arxiv.org/abs/2410.21845">Precise and Dexterous Robotic Manipulation via Human-in-the-Loop RL (HIL-SERL)</a></td><td>arXiv 2024</td></tr>
+      <tr><td>Mark et al., <a href="https://arxiv.org/abs/2412.06685">Policy Agnostic RL: Offline RL and Online RL Fine-Tuning of Any Class and Backbone (PA-RL)</a></td><td>arXiv 2024</td></tr>
+      <tr><td>Chen et al., <a href="https://arxiv.org/abs/2502.05450">ConRFT: A Reinforced Fine-tuning Method for VLA Models via Consistency Policy</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Rudin, Hoeller, Reist, Hutter, <a href="https://arxiv.org/abs/2109.11978">Learning to Walk in Minutes Using Massively Parallel Deep RL</a></td><td>CoRL 2021</td></tr>
+      <tr><td>Lee et al., <a href="https://arxiv.org/abs/2010.11251">Learning Quadrupedal Locomotion over Challenging Terrain</a></td><td>Science Robotics 2020</td></tr>
+      <tr><td>DeepSeek-AI, <a href="https://arxiv.org/abs/2501.12948">DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via RL</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Du et al., <a href="https://arxiv.org/abs/2303.07280">Vision-Language Models as Success Detectors</a></td><td>arXiv 2023</td></tr>
+      <tr><td>Ma et al., <a href="https://arxiv.org/abs/2411.04549">Vision Language Models are In-Context Value Learners (GVL)</a></td><td>arXiv 2024</td></tr>
+      <tr><td>Zhai et al., <a href="https://arxiv.org/abs/2509.15937">A Vision-Language-Action-Critic Model for Robotic Real-World RL (VLAC)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Zhang et al., <a href="https://arxiv.org/abs/2505.10911">ReWiND: Language-Guided Rewards Teach Robot Policies without New Demonstrations</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Ren et al., <a href="https://arxiv.org/abs/2409.00588">Diffusion Policy Policy Optimization (DPPO)</a></td><td>ICLR 2025</td></tr>
+      <tr><td>Zhang, Yu, Su, Wang, <a href="https://arxiv.org/abs/2505.22094">ReinFlow: Fine-tuning Flow Matching Policy with Online RL</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Chen et al., <a href="https://arxiv.org/abs/2510.25889">πRL: Online RL Fine-tuning for Flow-based VLA Models</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Wagenmaker et al., <a href="https://arxiv.org/abs/2506.15799">Steering Your Diffusion Policy with Latent Space RL (DSRL)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Kwok et al., <a href="https://arxiv.org/abs/2506.17811">RoboMonkey: Scaling Test-Time Sampling and Verification for VLA Models</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Nakamoto, Mees, Kumar, Levine, <a href="https://arxiv.org/abs/2410.13816">Steering Your Generalists: Improving Robotic Foundation Models via Value Guidance (V-GPS)</a></td><td>CoRL 2024</td></tr>
+      <tr><td>Black, Galliker, Levine, <a href="https://arxiv.org/abs/2506.07339">Real-Time Execution of Action Chunking Flow Policies</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Hancock et al., <a href="https://arxiv.org/abs/2509.22195">Actions as Language: Fine-Tuning VLMs into VLAs Without Catastrophic Forgetting (VLM2VLA)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Driess et al., <a href="https://arxiv.org/abs/2505.23705">Knowledge Insulating Vision-Language-Action Models</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Shenfeld, Pari, Agrawal, <a href="https://arxiv.org/abs/2509.04259">RL's Razor: Why Online Reinforcement Learning Forgets Less</a></td><td>ICLR 2026</td></tr>
+      <tr><td>Shenfeld, Damani, Hübotter, Agrawal, <a href="https://arxiv.org/abs/2601.19897">Self-Distillation Enables Continual Learning (SDFT)</a></td><td>ICML 2026</td></tr>
+      <tr><td>Yue et al., <a href="https://arxiv.org/abs/2504.13837">Does RL Really Incentivize Reasoning Capacity in LLMs Beyond the Base Model?</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Liu et al., <a href="https://arxiv.org/abs/2505.19789">What Can RL Bring to VLA Generalization? An Empirical Study (RL4VLA)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Li et al., <a href="https://arxiv.org/abs/2509.09674">SimpleVLA-RL: Scaling VLA Training via Reinforcement Learning</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Tan, Dou, Zhao, Krähenbühl, <a href="https://arxiv.org/abs/2505.17016">Interactive Post-Training for VLA Models (RIPT-VLA)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Lu et al., <a href="https://arxiv.org/abs/2505.18719">VLA-RL: Towards Masterful and General Robotic Manipulation with Scalable RL</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Li et al., <a href="https://arxiv.org/abs/2405.05941">Evaluating Real-World Robot Manipulation Policies in Simulation (SIMPLER)</a></td><td>CoRL 2024</td></tr>
+      <tr><td>Li et al., <a href="https://arxiv.org/abs/2505.19017">WorldEval: World Model as Real-World Robot Policies Evaluator</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Guo, Shi, Chen, Finn, <a href="https://arxiv.org/abs/2510.10125">Ctrl-World: A Controllable Generative World Model for Robot Manipulation</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Li et al., <a href="https://arxiv.org/abs/2510.00406">VLA-RFT: VLA Reinforcement Fine-tuning with Verified Rewards in World Simulators</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Zhu et al., <a href="https://arxiv.org/abs/2511.09515">WMPO: World Model-based Policy Optimization for VLA Models</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Kress-Gazit et al., <a href="https://arxiv.org/abs/2409.09491">Robot Learning as an Empirical Science: Best Practices for Policy Evaluation</a></td><td>arXiv 2024</td></tr>
+      <tr><td>Zhou et al., <a href="https://arxiv.org/abs/2503.24278">AutoEval: Autonomous Evaluation of Generalist Robot Manipulation Policies in the Real World</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Gao et al., <a href="https://arxiv.org/abs/2503.01238">A Taxonomy for Evaluating Generalist Robot Manipulation Policies (STAR-Gen)</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Shi et al., <a href="https://arxiv.org/abs/2502.19417">Hi Robot: Open-Ended Instruction Following with Hierarchical VLA Models</a></td><td>arXiv 2025</td></tr>
+      <tr><td>Zawalski et al., <a href="https://arxiv.org/abs/2407.08693">Robotic Control via Embodied Chain-of-Thought Reasoning (ECoT)</a></td><td>CoRL 2024</td></tr>
+    </table></div>
+  </article>
+</body>
+</html>

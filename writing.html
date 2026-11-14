@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Writing · Anirudha Karande</title>
+  <meta name="description" content="Notes by Anirudha Karande: literature reviews on sensorimotor neuroscience and robot learning, fundamentals, and maths notes.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&display=swap">
+  <link rel="stylesheet" href="style.css?v=25">
+  <script src="theme.js?v=5"></script>
+  <script data-goatcounter="https://anirudha.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body class="home">
+
+  <canvas id="sky" aria-hidden="true"></canvas>
+
+  <nav id="nav">
+    <a href="index.html" class="name">Anirudha Karande</a>
+    <div class="links">
+      <a href="papers.html">Papers</a>
+      <a href="projects.html">Projects</a>
+      <a href="writing.html" aria-current="page">Writing</a>
+      <a href="index.html#code">Open source</a>
+      <a href="index.html#contact">Contact</a>
+      <button class="theme-toggle" type="button" aria-label="Switch between light and dark"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button>
+    </div>
+  </nav>
+
+  <main class="sections">
+    <section id="writing" class="page">
+      <h1 class="heading">Writing</h1>
+      <p class="text">Notes on how the brain controls movement and what robots can learn from it, the maths I use, and
+        how the computers that run robots work.</p>
+      <div class="rows">
+        <a class="row start" href="posts/lit-neuro-to-robot.html"><span class="what"><span class="title">From Sensorimotor Neuroscience to Robot Learning</span> <span class="kind">start here</span> <span class="hook">A principle-by-principle map, with the experiment that would test each transfer.</span></span></a>
+      </div>
+      <details class="shelf" open>
+        <summary>Literature review <span class="count">14 notes</span></summary>
+        <p class="subgroup">From sensorimotor neuroscience to robots</p>
+        <div class="rows">
+        <a class="row" href="posts/lit-human-impedance.html"><span class="what"><span class="title">Impedance in the Human Motor System</span> <span class="hook">How the arm measures, learns and directs its own stiffness, and the robot controllers built on it.</span></span></a>
+        <a class="row" href="posts/lit-internal-models.html"><span class="what"><span class="title">Internal Models and Two-Speed Adaptation</span> <span class="hook">Forward and inverse models, MOSAIC, and the fast and slow learners behind savings.</span></span></a>
+        <a class="row" href="posts/lit-optimal-feedback.html"><span class="what"><span class="title">Optimal Feedback Control and the Minimum-Intervention Principle</span> <span class="hook">From minimum jerk to correcting only what matters, and what that means for RL rewards.</span></span></a>
+        <a class="row" href="posts/lit-touch-grip.html"><span class="what"><span class="title">Touch, Grip and the Control of Dexterous Manipulation</span> <span class="hook">Grip scaled to friction, tactile events as checkpoints, and slip that starts at the edge.</span></span></a>
+        <a class="row" href="posts/lit-synergies.html"><span class="what"><span class="title">Synergies and Motor Primitives</span> <span class="hook">Spinal force fields, hand synergies, eigengrasps and dynamic movement primitives.</span></span></a>
+        <a class="row" href="posts/lit-population-dynamics.html"><span class="what"><span class="title">Neural Population Dynamics and Policies as Dynamical Systems</span> <span class="hook">Rotations in motor cortex, networks that reproduce them, and what to look for in a policy.</span></span></a>
+        </div>
+        <p class="subgroup">Robot learning</p>
+        <div class="rows">
+        <a class="row" href="posts/lit-post-training.html"><span class="what"><span class="title">Post-Training Robot Policies: Challenges, Problems and Open Questions</span> <span class="hook">Why demos cap a robot, why RL on a flow policy needs tricks, what fine-tuning forgets, and eleven open questions.</span></span></a>
+        <a class="row" href="posts/lit-vic-vs-fixed.html"><span class="what"><span class="title">Learned Variable Impedance vs. a Tuned Fixed Gain</span> <span class="hook">Twenty papers, one question, and a model: stiffness answers force uncertainty, compliance answers position uncertainty.</span></span></a>
+        <a class="row" href="posts/lit-adaptation.html"><span class="what"><span class="title">Learning to Adapt: System Identification for Sim-to-Real</span> <span class="hook">Why randomisation makes policies timid, why excitation decides identifiability, and what people do instead.</span></span></a>
+        <a class="row" href="posts/lit-passivity-learning.html"><span class="what"><span class="title">Energy Tanks and Passivity for Learned Controllers</span> <span class="hook">300 random stiffness schedules, the price of a tank, and policies that drive passive controllers.</span></span></a>
+        <a class="row" href="posts/lit-safe-rl.html"><span class="what"><span class="title">Safe RL for Contact: Constraints, Filters and Games</span> <span class="hook">Why Lagrange multipliers oscillate, the set you can stay in, latent safe sets, and safety as a game.</span></span></a>
+        <a class="row" href="posts/lit-spd-geometry.html"><span class="what"><span class="title">Stiffness Lives on a Manifold</span> <span class="hook">SPD geometry, Riemannian flow matching, and an experiment on which chart to generate stiffness in.</span></span></a>
+        <a class="row" href="posts/lit-adversarial-games.html"><span class="what"><span class="title">Adversaries and Games for Robot Robustness</span> <span class="hook">Robust RL as H-infinity control, gradient play that spirals, and people playing motor games.</span></span></a>
+        </div>
+      </details>
+      <details class="shelf" open>
+        <summary>Fundamentals <span class="count">13 notes</span></summary>
+        <p class="subgroup">Learning and numerics</p>
+        <div class="rows">
+        <a class="row" href="posts/fund-optimization.html"><span class="what"><span class="title">Optimization for Robot Learning, From First Principles</span></span></a>
+        <a class="row" href="posts/fund-neural-networks.html"><span class="what"><span class="title">Neural Networks, Mechanically</span></span></a>
+        <a class="row" href="posts/fund-models-policies.html"><span class="what"><span class="title">Models and Policies: Forward, Inverse, Neural ODE and State-Space</span></span></a>
+        <a class="row" href="posts/fund-transformer.html"><span class="what"><span class="title">The Transformer, From 2017 to Now</span></span></a>
+        <a class="row" href="posts/fund-floating-point.html"><span class="what"><span class="title">Floating Point for Robot Learning</span></span></a>
+        </div>
+        <p class="subgroup">Machines that run robots</p>
+        <div class="rows">
+        <a class="row" href="posts/fund-memory-realtime.html"><span class="what"><span class="title">Caches, Latency and the 1 kHz Loop</span></span></a>
+        <a class="row" href="posts/fund-processes.html"><span class="what"><span class="title">Processes, Threads and the Kernel Under a Robot</span></span></a>
+        <a class="row" href="posts/fund-gpu-cuda.html"><span class="what"><span class="title">How a GPU Runs Your Policy</span></span></a>
+        <a class="row" href="posts/fund-dynamics.html"><span class="what"><span class="title">Rigid-Body Dynamics as an Algorithm</span></span></a>
+        <a class="row" href="posts/fund-deployment.html"><span class="what"><span class="title">Running a Policy on Real Hardware</span></span></a>
+        <a class="row" href="posts/fund-policy-files.html"><span class="what"><span class="title">What&rsquo;s Inside a Policy File, and How a Robot Runs It</span></span></a>
+        </div>
+        <p class="subgroup">Computing in nervous systems</p>
+        <div class="rows">
+        <a class="row" href="posts/fund-neurons.html"><span class="what"><span class="title">How Neurons Compute: Physics, Energy and Delay</span></span></a>
+        <a class="row" href="posts/fund-information.html"><span class="what"><span class="title">Bits, Delays and Control</span></span></a>
+        </div>
+      </details>
+      <details class="shelf" open>
+        <summary>Maths notes <span class="count">6 notes</span></summary>
+        <div class="rows">
+        <a class="row" href="posts/misc-so3.html"><span class="what"><span class="title">Rotations Form a Group: SO(3) and Its Exponential Map</span></span></a>
+        <a class="row" href="posts/misc-spd-distances.html"><span class="what"><span class="title">Distances Between Stiffness Matrices</span></span></a>
+        <a class="row" href="posts/misc-riemannian-gd.html"><span class="what"><span class="title">Gradient Descent on a Manifold</span></span></a>
+        <a class="row" href="posts/misc-minimax-lp.html"><span class="what"><span class="title">Minimax by Linear Programming</span></span></a>
+        <a class="row" href="posts/misc-passivity.html"><span class="what"><span class="title">Passivity in One Page</span></span></a>
+        <a class="row" href="posts/misc-skew-symmetry.html"><span class="what"><span class="title">Why Coriolis Forces Do No Work</span></span></a>
+        </div>
+      </details>
+    </section>
+
+    <footer><span>&copy; Anirudha Karande</span><span>Worcester Polytechnic Institute</span></footer>
+  </main>
+
+  <script src="home.js?v=8" defer></script>
+</body>
+</html>
