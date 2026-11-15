@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demonstrations Never Go Back · Anirudha Karande</title>
+  <meta name="description" content="Why learned selectors, from LIBERO routers and VLAs to modular robot controllers, keep the wrong skill after a person undoes a step; how to measure it before deployment, and a fix.">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=IBM+Plex+Mono:wght@400&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+  <link rel="stylesheet" href="../style.css?v=25">
+  <script src="../theme.js?v=5"></script>
+  <script data-goatcounter="https://anirudha.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+  <article class="post project">
+    <div class="post-top"><a class="back" href="../papers.html">&larr; Papers</a><button class="theme-toggle" type="button" aria-label="Switch between light and dark"><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button></div>
+    <h1>Demonstrations Never Go Back: Why Learned Selectors Keep the Wrong Expert</h1>
+    <p class="meta">[Paper in preparation · first author, with Jing Xiao]</p>
+
+    <figure class="fig wide lead">
+      <video src="media/libero_undo.mp4" poster="media/libero_undo_poster.jpg" width="1280" height="664" autoplay muted loop
+        playsinline controls preload="metadata"></video>
+      <figcaption><b>LIBERO, stove scene.</b> The task: turn on the stove (A), then put the moka pot on it (B). While the
+        robot carries the pot, a person switches the stove off. Left: a vision-language router trained on its own data
+        keeps running B and puts the pot on a cold stove. Right: a router of the same design trained with off-path data
+        goes back, turns the stove on and finishes the task. Same start state, same undo; both use a scripted return to
+        the start pose before the stove skill restarts. The dot is green while the router names the subtask the scene
+        needs. 1.5&times; speed.</figcaption>
+    </figure>
+
+    <div class="tldr"><p class="tldr-label">TL;DR</p>
+      <p><b>Problem.</b> Robots that chain skills use a learned selector: a high-level policy that names the next subtask,
+      or a gate that chooses among controllers. When a person undoes a step, the selector keeps the wrong skill. In
+      LIBERO, routers moved on after a step was done for them in all but 6 of 1,467 episodes, and kept the wrong skill
+      in 248 of 1,110 after an undo; two published VLAs (SmolVLA, &pi;<sub>0.5</sub>) redid an undone step in 3% and
+      10% of episodes.</p>
+      <p><b>Insight.</b> Demonstrations only move forward, so in the training data the skill that acts is always the
+      skill that is needed. The selector learns to read who is acting as evidence of what is needed, and after an undo
+      the wrong skill's own behaviour keeps confirming it: self-confirming selection. Swapping only the acting skill in
+      the same undone state moved the routers' log-odds by 8.0 (pre-registered).</p>
+      <p><b>Approach.</b> A forced recording, read from the moment of the change, measures lock-in before deployment.
+      Off-path training data repairs it where the change is visible under the wrong skill; where the wrong skill's
+      behaviour hides the change, the robot has to act to reveal it. Skills trained to resume turn recall into
+      completion.</p>
+      <p><b>Result.</b> In simulation, with predictions fixed before testing: the forced recording predicted live lock-in
+      (mean error 0.15 against 0.63; AUC 0.74 to 0.95 against 0.40 to 0.73 for accuracy); off-path data cut
+      never-recalled undo episodes from 147 of 416 to 15 of 424; and with resumable skills, covered routers completed 26
+      of 60 tasks after an undo, against 2 of 60. The same failure appears in modular controllers on a Franka Panda and
+      four legged robots.</p></div>
+
+    <h2>Forward, not back</h2>
+    <p>In LIBERO-10, a Franka arm does subtask A and then subtask B, and a learned router picks which skill runs every ten
+      steps. We changed the world in two ways while it worked. <i>Done for you</i>: a person finishes A for the robot.
+      <i>Undone for you</i>: a person undoes A while B's skill is running. Eight routers, small MLPs and SmolVLM2
+      vision-language models, moved on after done for you in all but 6 of 1,467 episodes. After an undo, they kept running
+      B in 248 of 1,110.</p>
+    <p>Two published VLA policies with no router, SmolVLA and &pi;<sub>0.5</sub>, did the same. After an undo they redid A
+      in only 3% and 10% of episodes, although each had done A earlier in the episode.</p>
+
+    <h2>Who acts decides the call</h2>
+    <p>Why would a router that sees the undone state keep the wrong skill? In the demonstrations, the skill that acts is
+      always the subtask that is needed: the data fill only the diagonal of the table below. A router can therefore learn
+      which skill is acting rather than which subtask is needed.</p>
+    <figure class="fig paper">
+      <img src="media/sc_never_sees.webp" width="532" height="353" loading="lazy" style="max-width: 460px" alt="A two-by-two grid of LIBERO frames: A or B needed against A or B acting. Only the diagonal cells occur in demonstrations; the off-diagonal cells are forced.">
+      <figcaption><b>What the router never sees.</b> Demonstrations cover only states where the acting skill is the needed
+        one. The off-diagonal cells, where one skill acts while the other is needed, are exactly what an undo
+        creates.</figcaption>
+    </figure>
+    <p>We tested this by intervention. From the same undone state, either B's skill kept acting or A's skill acted, with A
+      needed in both, and we replayed both recordings through 48 new routers. With A's skill acting, routers trained on
+      their own data gave A log-odds 8.0 higher (pre-registered; 95% interval 7.0 to 9.0). Almost none of it came from
+      the robot's arm state; the camera images carried it.</p>
+
+    <h2>Measuring it before deployment</h2>
+    <p>Accuracy on held-out demonstrations cannot see this failure, because demonstrations never contain an undo; on the
+      first routers it ranked the lock-ins below chance. A forced recording can: from held-out start states, make the
+      change, keep the current skill acting, and read the router from that moment. Until the router switches, this
+      recording is the live episode. Pre-registered on 48 new routers, it predicted each router's live lock-in rate with a
+      mean error of 0.15, against 0.63 for a per-step baseline, and ranked live episodes at an AUC of 0.74 to 0.95 in each
+      scene, against 0.40 to 0.73 for accuracy.</p>
+
+    <h2>Fixing it</h2>
+    <p>Off-path data repairs it. Adding forced episodes, labelled with the subtask that is needed, to the router's
+      training data cut never-recalled undo episodes from 147 of 416 to 15 of 424 (a pre-registered trend).</p>
+    <p>Going back is not yet finishing: skills trained only forward cannot start from mid-task states, such as holding the
+      moka pot. With a scripted return to the start pose, covered routers completed 42 of 55 tasks after an undo,
+      against 4 of 52 for routers trained on their own data; the clip at the top is from these runs. Skills fine-tuned on
+      segments recorded from interrupted states need no return: with them, covered routers completed 26 of 60 tasks,
+      against 2 of 60.</p>
+
+    <h2>The same failure in modular controllers</h2>
+    <p>The same trap catches a gate that chooses among controllers by how well each controller's model predicts what the
+      robot senses.</p>
+    <p>Take a quadruped that has learned two ways to walk: normally, and with a weak front leg. A common way to choose
+      between such skills is to give each one a forward model, which predicts what the robot will sense next, and to hand
+      control to the skill whose model predicts best.</p>
+    <p>Now the leg weakens. The limping skill takes over, as it should. Then the leg recovers. The limping skill is still
+      in control, so everything the robot senses comes from limping. The normal-walking model only ever saw normal
+      walking, so on this data its predictions look poor, and the gate keeps the limping skill. The robot goes on limping
+      on a healthy leg.</p>
+    <p>The choice confirms itself: the skill in control produces the evidence on which every skill is judged. We call this
+      <b>self-confirming selection</b>. People show something similar after an injury, called learned non-use: a patient
+      keeps avoiding a limb after it has healed.</p>
+
+    <figure class="fig">
+      <svg class="mech" viewBox="0 0 680 290" role="img" aria-label="Diagram: skill A acts on the robot and world; both forward models score what the robot senses; model B was never trained while A acts, so the gate keeps A in control.">
+        <defs>
+          <marker id="m-warm" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="warm-fill" d="M0 0 L10 5 L0 10 z"/></marker>
+          <marker id="m-grey" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="grey-fill" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <!-- the skills -->
+        <rect class="warm-tint warm-line" x="24" y="38" width="122" height="50" rx="9"/>
+        <text class="t-strong" x="85" y="60" text-anchor="middle">Skill A</text>
+        <text class="t-small warm-fill" x="85" y="77" text-anchor="middle">in control</text>
+        <rect class="paper dash-line" x="24" y="104" width="122" height="50" rx="9"/>
+        <text class="t-strong muted-fill" x="85" y="126" text-anchor="middle">Skill B</text>
+        <text class="t-small muted-fill" x="85" y="143" text-anchor="middle">the right one now</text>
+        <!-- acts -->
+        <line class="warm-line" x1="146" y1="63" x2="212" y2="63" marker-end="url(#m-warm)"/>
+        <text class="t-small warm-fill t-bold" x="179" y="55" text-anchor="middle">acts</text>
+        <!-- robot and world -->
+        <rect class="ink-fill" x="216" y="34" width="148" height="124" rx="12"/>
+        <text class="t-strong bg-fill" x="290" y="76" text-anchor="middle">Robot and world</text>
+        <rect class="pill" x="236" y="96" width="108" height="26" rx="13"/>
+        <text class="t-small bg-fill" x="290" y="113" text-anchor="middle">situation changed</text>
+        <!-- senses -->
+        <line class="grey-line" x1="364" y1="63" x2="436" y2="63" marker-end="url(#m-grey)"/>
+        <line class="grey-line" x1="364" y1="129" x2="436" y2="129" marker-end="url(#m-grey)"/>
+        <text class="t-small muted-fill" x="400" y="55" text-anchor="middle">senses</text>
+        <!-- the forward models -->
+        <rect class="paper warm-line" x="440" y="42" width="150" height="42" rx="9"/>
+        <text class="t-strong" x="515" y="68" text-anchor="middle">Model of A</text>
+        <rect class="paper cool-line" x="440" y="108" width="150" height="42" rx="9"/>
+        <text class="t-strong" x="515" y="134" text-anchor="middle">Model of B</text>
+        <text class="t-small warm-fill t-bold" x="515" y="171" text-anchor="middle">never trained while A acts</text>
+        <!-- scores to the gate -->
+        <path class="grey-line" d="M590 63 H616 V129 H590 M616 96 V232 H600" fill="none" marker-end="url(#m-grey)"/>
+        <text class="t-small muted-fill" x="624" y="170">score</text>
+        <!-- the gate -->
+        <rect class="paper rule-line" x="304" y="196" width="292" height="74" rx="10"/>
+        <text class="t-strong" x="320" y="222">Gate</text>
+        <text class="t-small muted-fill" x="320" y="241">which model predicts</text>
+        <text class="t-small muted-fill" x="320" y="257">best?</text>
+        <rect class="warm-bar" x="474" y="210" width="26" height="40" rx="3"/>
+        <rect class="cool-bar" x="526" y="244" width="26" height="6" rx="2"/>
+        <line class="rule-line" x1="462" y1="250.5" x2="566" y2="250.5"/>
+        <text class="t-small muted-fill" x="487" y="265" text-anchor="middle">A</text>
+        <text class="t-small muted-fill" x="539" y="265" text-anchor="middle">B</text>
+        <!-- A keeps control -->
+        <path class="warm-line dashed" d="M304 233 H10 V63 H20" fill="none" marker-end="url(#m-warm)"/>
+        <text class="t-small warm-fill t-bold" x="157" y="252" text-anchor="middle">A keeps control</text>
+      </svg>
+      <figcaption>The skill in control produces everything the robot senses. The model of the right skill was never
+        trained while the other skill was acting, so on this data it looks wrong, and the gate keeps the wrong skill in
+        control.</figcaption>
+    </figure>
+
+    <h2>On walking robots and a carrying arm</h2>
+    <figure class="fig wide">
+      <video src="media/go1_recall.mp4" poster="media/go1_poster.jpg" width="1280" height="664" autoplay muted loop
+        playsinline controls preload="metadata"></video>
+      <figcaption><b>Unitree Go1.</b> One recorded session. The front-left leg (pink) weakens, then recovers; the bar on
+        top shows when. The dot by each label is green while the right skill is in control and red while it is not.
+        Standard selection (left) keeps the limping skill after the leg recovers; with our fix (right), the robot goes
+        back to normal walking.</figcaption>
+    </figure>
+    <figure class="fig wide">
+      <video src="media/g1_recall.mp4" poster="media/g1_poster.jpg" width="1280" height="664" autoplay muted loop
+        playsinline controls preload="metadata"></video>
+      <figcaption><b>Unitree G1.</b> The same on a humanoid. Here standard selection is stuck from the start: it begins
+        on a limping skill while both legs are fine, and keeps the left-leg limp after the left leg recovers. With our
+        fix, the matching skill takes over each time.</figcaption>
+    </figure>
+    <p>It is not only about legs. A Franka Panda carries containers that look alike but hold different contents, and it
+      has one carrying skill for each. When the contents change from a heavy solid to a liquid with no cue, standard
+      selection settles on the skill for a solid of the same weight, and the liquid spills.</p>
+    <figure class="fig wide">
+      <video src="media/containers_recall.mp4" poster="media/containers_poster.jpg" width="1280" height="664" autoplay muted
+        loop playsinline controls preload="metadata"></video>
+      <figcaption><b>Franka Panda, look-alike containers.</b> One recorded session, around the switch from a heavy solid
+        to a liquid. Standard selection (left) hands control to the skill for a solid of the same weight, and the liquid
+        spills; it turns red while spilling. With our fix (right), the liquid skill takes over and nothing spills in this
+        clip.</figcaption>
+    </figure>
+    <figure class="fig wide">
+      <div class="ghosts">
+        <div class="ghost">
+          <p class="ghost-label">Standard selection</p>
+          <svg viewBox="175 101 544 580" role="img" aria-label="Standard selection: ghost images of the arm carrying the container">
+            <image href="media/ghost_standard.webp" x="175" y="101" width="544" height="580"/>
+            <path class="slosh" d="M636.2 471.9 L650.6 467.2 L663.3 457.8 L672.3 443.6 L676.0 426.3 L673.2 407.9 L663.1 390.8 L646.0 376.9 L623.0 367.2 L595.7 361.5 L566.6 358.9"/><path class="calm" d="M566.6 358.9 L538.0 358.1"/><path class="slosh" d="M538.0 358.1 L512.3 358.4 L491.5 359.2 L476.8 360.4 L468.9 362.0 L467.9 364.1 L473.1 366.4 L483.2 369.0 L496.8 371.5 L512.1 373.2"/><path class="calm" d="M512.1 373.2 L527.4 373.5"/><path class="slosh" d="M527.4 373.5 L540.9 371.7 L551.4 367.7 L558.0 362.2 L560.0 356.3 L557.5 350.9 L551.1 347.0 L541.8 344.8"/><path class="calm" d="M541.8 344.8 L531.2 344.4 L520.7 345.5"/><path class="slosh" d="M520.7 345.5 L511.9 347.8 L505.9 350.5 L503.6 353.5 L505.1 356.4 L510.2 359.0 L518.0 361.3 L527.4 363.2"/><path class="calm" d="M527.4 363.2 L537.2 364.6 L545.9 365.5"/><path class="slosh" d="M545.9 365.5 L552.4 365.9 L555.8 366.0 L555.7 365.6 L552.0 365.1 L545.3 364.3 L536.3 363.6"/><path class="calm" d="M536.3 363.6 L526.2 362.8 L516.1 362.2 L507.5 361.8"/><path class="slosh" d="M507.5 361.8 L501.2 361.9 L498.0 362.5 L498.0 363.9 L500.8 365.6"/>
+          </svg>
+        </div>
+        <div class="ghost">
+          <p class="ghost-label">With our fix</p>
+          <svg viewBox="175 101 544 580" role="img" aria-label="With our fix: ghost images of the arm carrying the container">
+            <image href="media/ghost_fix.webp" x="175" y="101" width="544" height="580"/>
+            <path class="slosh" d="M605.6 456.1 L614.9 454.1 L622.1 448.4 L626.1 441.2 L626.4 434.3 L622.9 428.2 L616.1 423.1 L607.1 418.9 L596.8 415.6 L586.5 413.1 L577.3 411.5 L570.2 410.5 L565.8 409.8 L564.3 409.3 L565.8 408.7 L569.5 407.8 L574.6 406.6 L580.1 404.9 L584.8 402.8 L587.9 400.3 L588.7 397.5 L587.1 394.7 L583.1 391.9 L577.1 389.4 L569.8 387.2 L562.1 385.4"/><path class="calm" d="M562.1 385.4 L554.7 384.1 L548.4 383.2"/><path class="slosh" d="M548.4 383.2 L543.8 382.8 L541.3 382.6 L540.8 382.7 L542.3 382.7 L545.2 382.7"/><path class="calm" d="M545.2 382.7 L548.9 382.4 L552.7 381.9 L555.8 380.9 L557.8 379.6 L558.2 378.0"/><path class="slosh" d="M558.2 378.0 L556.9 376.2"/><path class="calm" d="M556.9 376.2 L554.1 374.3 L550.0 372.5 L545.2 370.7 L540.1 369.3 L535.5 368.1 L531.7 367.2 L529.1 366.6 L527.9 366.3 L528.1 366.2 L529.5 366.1 L531.9 366.1 L534.6 365.9 L537.3 365.4 L539.4 364.3"/>
+          </svg>
+        </div>
+        <div class="ghost">
+          <p class="ghost-label">Told what it holds</p>
+          <svg viewBox="175 101 544 580" role="img" aria-label="Told what it holds: ghost images of the arm carrying the container">
+            <image href="media/ghost_told.webp" x="175" y="101" width="544" height="580"/>
+            <path class="calm" d="M600.7 448.8 L601.1 447.0 L601.5 443.4 L601.6 439.3 L601.3 435.5 L600.7 432.0 L599.6 428.6 L598.2 425.2 L596.4 421.9 L594.4 418.5 L592.2 415.2 L589.9 411.9 L587.5 408.7 L585.2 405.6 L583.1 402.8 L581.0 400.2 L579.2 397.8 L577.4 395.8 L575.8 394.0 L574.3 392.4 L572.7 391.0 L571.2 389.7 L569.5 388.5 L567.8 387.4 L566.0 386.3 L564.0 385.2 L562.0 384.0 L560.0 382.9 L557.9 381.6 L555.9 380.4 L554.1 379.2 L552.4 378.0 L550.9 376.9 L549.6 375.9 L548.5 374.9 L547.5 374.0 L546.7 373.2 L546.0 372.4 L545.4 371.7 L544.7 370.9 L544.0 370.1 L543.2 369.3 L542.3 368.5 L541.4 367.6 L540.3 366.6 L539.3 365.6 L538.2 364.6 L537.2 363.6 L536.3 362.6 L535.5 361.7 L534.8 360.8 L534.2 359.8 L533.7 358.6"/>
+          </svg>
+        </div>
+      </div>
+      <figcaption><b>Ghost images.</b> The arm over two seconds, starting two seconds after the contents turn to liquid;
+        fainter copies are earlier. The line traces the liquid, red while it sloshes past the spill point. Standard
+        selection never hands control to the liquid skill, and the liquid keeps sloshing. With our fix, the liquid skill
+        takes over 1.5 seconds after the switch and the sloshing stops about two seconds later. Told what it holds, the
+        robot moves gently from the start. One recorded session.</figcaption>
+    </figure>
+
+    <h2>The robots</h2>
+    <p>Besides the Panda, the project uses four walking robots, all in simulation. Partway through each run a leg weakens
+      or stops working, with no warning, and the robot has to switch to the skill for that body.</p>
+    <div class="fig wide gallery">
+        <figure class="tile">
+          <img src="media/ghost_g1.webp" width="1300" height="492" loading="lazy" alt="Ghost image of the Unitree G1 humanoid walking while the right leg weakens.">
+          <figcaption><b>Unitree G1</b> humanoid · the right leg weakens</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="media/ghost_go1.webp" width="1206" height="245" loading="lazy" alt="Ghost image of the Unitree Go1 quadruped walking while the front-right leg weakens.">
+          <figcaption><b>Unitree Go1</b> quadruped · the front-right leg weakens</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="media/ghost_ant.webp" width="1275" height="374" loading="lazy" alt="Ghost image of the Ant four-legged walking while the front-right leg stops working.">
+          <figcaption><b>Ant</b> four-legged · the front-right leg stops working</figcaption>
+        </figure>
+        <figure class="tile">
+          <img src="media/ghost_halfcheetah.webp" width="1009" height="289" loading="lazy" alt="Ghost image of the HalfCheetah two-legged runner walking while the front leg stops working.">
+          <figcaption><b>HalfCheetah</b> two-legged runner · the front leg stops working</figcaption>
+        </figure>
+      <p class="gallery-note">Ghost images: each robot drawn at even intervals over one to four seconds, earlier poses
+        fainter. The tinted leg is the impaired one.</p>
+    </div>
+
+    <h2>What matters</h2>
+    <ul>
+      <li><b>Forward, not back.</b> Learned selectors handle the changes their data contained and miss the ones it did
+        not: routers moved on after a step was done for them in all but 6 of 1,467 episodes, and kept the wrong skill in
+        248 of 1,110 after an undo. Two published VLAs rarely redid an undone step.</li>
+      <li><b>Who acts decides the call.</b> In the same state, a router's call follows whichever skill acts (8.0
+        log-odds, pre-registered), with or without the arm's state in its input.</li>
+      <li><b>Measured before deployment.</b> A forced recording, read from the moment of the change, predicts live
+        lock-in; accuracy on demonstrations cannot.</li>
+      <li><b>Model error versus hidden changes.</b> Where the change is visible under the wrong skill, off-path data
+        fixes it. Where the wrong skill's behaviour hides the change, no data can; the robot has to act to reveal it.</li>
+      <li><b>Recall is not completion.</b> The recalled skill must be able to resume from where it is handed the
+        task.</li>
+      <li><b>It is general.</b> The same failure appears in LIBERO routers, in flat VLAs, and in modular controllers on a
+        Franka Panda, HalfCheetah, Ant, and the Unitree Go1 and G1.</li>
+    </ul>
+
+    <h2>Takeaway</h2>
+    <p>A selector trained on data its own experts produced learns who is acting as much as what the world needs. Test it
+      by forcing the current expert through the change and reading the selector from that moment; train it on off-path
+      states; and where the current behaviour hides the change, act to reveal it.</p>
+
+    <p class="note">All results so far are in simulation, and most were pre-registered: the predictions were written and
+      hashed before the runs. Next: a multi-task high level that writes the next subtask in language, and a Franka Panda
+      with a person undoing steps.</p>
+  </article>
+</body>
+</html>
